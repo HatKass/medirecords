@@ -1,0 +1,14 @@
+package com.medirecords;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+
+@SpringBootApplication
+@ConfigurationPropertiesScan
+public class MediRecordsApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(MediRecordsApplication.class, args);
+    }
+}

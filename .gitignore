@@ -1,0 +1,16 @@
+# Environment
+.env
+
+# Backend
+backend/target/
+*.iml
+.idea/
+
+# Frontend (see also frontend/.gitignore)
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+
+# OS / editors
+.DS_Store
+Thumbs.db

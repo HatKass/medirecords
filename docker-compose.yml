@@ -1,0 +1,45 @@
+# One command to run everything:  docker compose up --build
+#   Frontend  http://localhost:4200
+#   Backend   http://localhost:8080  (Swagger UI: /swagger-ui/index.html)
+#   Postgres  localhost:5433
+name: medirecords
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-medirecords}
+      POSTGRES_USER: ${POSTGRES_USER:-medirecords}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-medirecords}
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-medirecords}
+      DB_USERNAME: ${POSTGRES_USER:-medirecords}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-medirecords}
+    ports:
+      - "${BACKEND_HOST_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "${FRONTEND_HOST_PORT:-4200}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  postgres-data:

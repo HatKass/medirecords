@@ -1,0 +1,65 @@
+# Every value can be overridden with an environment variable (shown in ${VAR:default}).
+# Defaults target local development against the Docker Compose Postgres.
+
+spring:
+  application:
+    name: medirecords-backend
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/medirecords}
+    username: ${DB_USERNAME:medirecords}
+    password: ${DB_PASSWORD:medirecords}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate          # Flyway owns the schema; Hibernate only checks it matches.
+    properties:
+      hibernate:
+        jdbc.time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  servlet:
+    multipart:
+      max-file-size: ${UPLOAD_MAX_FILE_SIZE:20MB}
+      max-request-size: ${UPLOAD_MAX_FILE_SIZE:20MB}
+  jackson:
+    time-zone: UTC
+  mvc:
+    problemdetails:
+      enabled: true               # RFC 9457 error bodies for framework exceptions.
+
+server:
+  port: ${PORT:8080}
+  forward-headers-strategy: framework   # Respect X-Forwarded-* from nginx / cloud load balancers.
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: ${HEALTH_SHOW_DETAILS:always}
+      probes:
+        enabled: true             # /actuator/health/liveness and /readiness for containers.
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: MediRecords
+    version: ${app.version}
+
+springdoc:
+  swagger-ui:
+    operations-sorter: method
+    tags-sorter: alpha
+
+app:
+  version: ${APP_VERSION:0.1.0}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:}
