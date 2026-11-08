@@ -14,6 +14,11 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', path: '/', icon: 'M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10' },
+  {
+    label: 'Patients',
+    path: '/patients',
+    icon: 'M16 19v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1M9.5 10a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M21 19v-1a4 4 0 0 0-3-3.87M15.5 3.13a3.5 3.5 0 0 1 0 6.74',
+  },
   { label: 'System status', path: '/status', icon: 'M4 13h4l3-8 3 14 3-6h3' },
 ];
 
@@ -72,10 +77,7 @@ const NAV_ITEMS: NavItem[] = [
 
           @if (auth.user(); as user) {
             <div class="flex items-center gap-3">
-              <div class="hidden text-right sm:block">
-                <p class="text-sm font-medium leading-tight">{{ user.fullName }}</p>
-                <p class="text-xs text-slate-500">{{ user.username }}</p>
-              </div>
+              <p class="hidden text-sm font-medium sm:block" [title]="'Signed in as ' + user.username">{{ user.fullName }}</p>
               <span [class]="roleBadgeClass()">{{ user.roles.join(', ') }}</span>
               <div class="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-700" aria-hidden="true">
                 {{ initials() }}

@@ -20,6 +20,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/dashboard/dashboard-page').then((m) => m.DashboardPage),
       },
       {
+        path: 'patients',
+        title: 'Patients · MediRecords',
+        loadComponent: () => import('./features/patients/patients-page').then((m) => m.PatientsPage),
+      },
+      {
         path: 'status',
         title: 'System status · MediRecords',
         loadComponent: () => import('./features/status/status-page').then((m) => m.StatusPage),

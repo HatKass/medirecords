@@ -26,6 +26,11 @@ spring:
       max-request-size: ${UPLOAD_MAX_FILE_SIZE:20MB}
   jackson:
     time-zone: UTC
+  data:
+    web:
+      pageable:
+        default-page-size: 20
+        max-page-size: 100        # larger requested sizes are capped, not rejected
   mvc:
     problemdetails:
       enabled: true               # RFC 9457 error bodies for framework exceptions.
