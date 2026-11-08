@@ -27,9 +27,20 @@ public class TestBrowser {
 
     private final TestRestTemplate restTemplate;
     private final Map<String, StoredCookie> cookies = new LinkedHashMap<>();
+    private final HttpHeaders extraHeaders = new HttpHeaders();
 
     public TestBrowser(TestRestTemplate restTemplate) {
         this.restTemplate = restTemplate;
+    }
+
+    /**
+     * A browser whose requests appear to come from this client address, the way a reverse proxy
+     * reports it (X-Forwarded-For, honoured by the backend's forwarded-header support).
+     */
+    public static TestBrowser from(TestRestTemplate restTemplate, String clientIp) {
+        TestBrowser browser = new TestBrowser(restTemplate);
+        browser.extraHeaders.set("X-Forwarded-For", clientIp);
+        return browser;
     }
 
     /** Raw Set-Cookie header for the named cookie, or fails if the response did not set it. */
@@ -127,6 +138,7 @@ public class TestBrowser {
     private <T> ResponseEntity<T> send(HttpMethod method, String path, Object body, Class<T> type, String csrfHeader,
             MediaType contentType) {
         HttpHeaders headers = new HttpHeaders();
+        headers.addAll(extraHeaders);
         headers.setContentType(contentType);
         String cookieHeader = cookies.entrySet().stream()
                 .filter(entry -> path.startsWith(entry.getValue().path()))
