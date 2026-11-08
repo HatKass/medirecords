@@ -112,5 +112,10 @@ PR is checked once, not once for the push and again for the PR):
 2. **frontend**: `npm ci`, unit tests, production build.
 3. **e2e** (after both pass): `docker compose up --build --wait`, then
    `npx playwright install --with-deps chromium` and `npx playwright test` with the bundled Chromium
-   (`E2E_BROWSER_CHANNEL` is not set in CI). On failure, the stack logs, report and traces are kept
-   as an artifact.
+   (`E2E_BROWSER_CHANNEL` is not set in CI). On failure, the stack logs are printed and the HTML
+   report and traces (`playwright-report/`, `test-results/`) are uploaded as the `playwright-report`
+   artifact; open a trace with `npx playwright show-trace <trace.zip>`.
+
+   This job runs on `ubuntu-24.04`, not `ubuntu-latest`: Playwright installs its browsers only on
+   Ubuntu releases it supports, and Playwright 1.56 rejects 26.04 (the current `ubuntu-latest`).
+   Move the runner forward only together with a Playwright upgrade.

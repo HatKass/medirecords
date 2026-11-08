@@ -75,7 +75,10 @@ jobs:
   e2e:
     name: End-to-end tests (Playwright, Docker Compose stack)
     needs: [backend, frontend]
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: Playwright only installs its browsers and their system libraries on
+    # Ubuntu releases it supports, and ubuntu-latest moved to 26.04, which Playwright 1.56 rejects.
+    # Move this forward together with a Playwright upgrade (keep e2e/package.json in step).
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
