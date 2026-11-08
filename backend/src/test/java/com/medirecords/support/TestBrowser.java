@@ -69,8 +69,22 @@ public class TestBrowser {
         return send(HttpMethod.POST, path, body, type, false);
     }
 
+    /**
+     * Sends a request with exactly this X-XSRF-TOKEN header value ({@code null}: no header), whatever the
+     * XSRF-TOKEN cookie holds. For CSRF tests that forge or omit the token on a real endpoint.
+     */
+    public <T> ResponseEntity<T> sendWithCsrfHeader(HttpMethod method, String path, Object body, Class<T> type,
+            String csrfHeader) {
+        return send(method, path, body, type, csrfHeader, MediaType.APPLICATION_JSON);
+    }
+
     /** Multipart upload of one file part named "file", like a browser form / FormData. */
     public <T> ResponseEntity<T> upload(String path, String fileName, byte[] content, Class<T> type) {
+        return upload(path, fileName, content, type, cookie("XSRF-TOKEN"));
+    }
+
+    /** Upload with exactly this X-XSRF-TOKEN header value ({@code null}: no header). */
+    public <T> ResponseEntity<T> upload(String path, String fileName, byte[] content, Class<T> type, String csrfHeader) {
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         body.add("file", new ByteArrayResource(content) {
             @Override
@@ -78,7 +92,7 @@ public class TestBrowser {
                 return fileName;
             }
         });
-        return send(HttpMethod.POST, path, body, type, true, MediaType.MULTIPART_FORM_DATA);
+        return send(HttpMethod.POST, path, body, type, csrfHeader, MediaType.MULTIPART_FORM_DATA);
     }
 
     public <T> ResponseEntity<T> put(String path, Object body, Class<T> type) {
@@ -107,10 +121,10 @@ public class TestBrowser {
     }
 
     private <T> ResponseEntity<T> send(HttpMethod method, String path, Object body, Class<T> type, boolean withCsrf) {
-        return send(method, path, body, type, withCsrf, MediaType.APPLICATION_JSON);
+        return send(method, path, body, type, withCsrf ? cookie("XSRF-TOKEN") : null, MediaType.APPLICATION_JSON);
     }
 
-    private <T> ResponseEntity<T> send(HttpMethod method, String path, Object body, Class<T> type, boolean withCsrf,
+    private <T> ResponseEntity<T> send(HttpMethod method, String path, Object body, Class<T> type, String csrfHeader,
             MediaType contentType) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(contentType);
@@ -121,8 +135,8 @@ public class TestBrowser {
         if (!cookieHeader.isEmpty()) {
             headers.add(HttpHeaders.COOKIE, cookieHeader);
         }
-        if (withCsrf && cookie("XSRF-TOKEN") != null) {
-            headers.add("X-XSRF-TOKEN", cookie("XSRF-TOKEN"));
+        if (csrfHeader != null) {
+            headers.add("X-XSRF-TOKEN", csrfHeader);
         }
         ResponseEntity<T> response = restTemplate.exchange(path, method, new HttpEntity<>(body, headers), type);
         store(response);

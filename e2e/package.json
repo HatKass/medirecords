@@ -1,0 +1,13 @@
+{
+  "name": "medirecords-e2e",
+  "private": true,
+  "description": "Playwright end-to-end tests against a running MediRecords stack (see README.md)",
+  "scripts": {
+    "test": "playwright test",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@types/node": "^22.10.0"
+  }
+}

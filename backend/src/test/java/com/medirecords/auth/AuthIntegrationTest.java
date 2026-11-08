@@ -4,6 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.medirecords.TestcontainersConfiguration;
 import com.medirecords.support.TestBrowser;
+import com.medirecords.support.TestData;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,6 +21,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * Exercises the cookie session end to end against a real database, through a {@link TestBrowser}
@@ -27,6 +33,12 @@ class AuthIntegrationTest {
 
     @Autowired
     private TestRestTemplate restTemplate;
+
+    @Autowired
+    private JdbcTemplate jdbc;
+
+    @Autowired
+    private RefreshTokenService refreshTokens;
 
     private TestBrowser browser;
 
@@ -181,6 +193,66 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void expiredRefreshTokenIsRejectedAndEndsTheSession() {
+        browser.login("admin");
+        String tokenHash = sha256(browser.cookie(AuthCookies.REFRESH_COOKIE));
+        jdbc.update("UPDATE refresh_token SET expires_at = now() - interval '1 minute' WHERE token_hash = ?", tokenHash);
+
+        ResponseEntity<Problem> refresh = browser.post("/api/auth/refresh", null, Problem.class);
+
+        assertThat(refresh.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(refresh.getBody().title()).isEqualTo("Session expired");
+        assertThat(TestBrowser.setCookie(refresh, AuthCookies.ACCESS_COOKIE)).contains("Max-Age=0");
+        assertThat(jdbc.queryForObject("SELECT revoked_at IS NOT NULL FROM refresh_token WHERE token_hash = ?",
+                Boolean.class, tokenHash)).isTrue();
+    }
+
+    @Test
+    void madeUpRefreshTokenIsRejected() {
+        browser.fetchCsrfCookie();
+        browser.setCookie(AuthCookies.REFRESH_COOKIE, "made-up-" + TestData.randomLetters(20));
+
+        ResponseEntity<Problem> refresh = browser.post("/api/auth/refresh", null, Problem.class);
+
+        assertThat(refresh.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(refresh.getBody().title()).isEqualTo("Session expired");
+    }
+
+    /** Disabling an account takes effect at the next refresh (at most one access-token lifetime later). */
+    @Test
+    void disabledAccountCannotRefreshOrSignInAgain() {
+        String username = "temp-" + TestData.randomLetters(8);
+        jdbc.update("INSERT INTO app_user (username, password_hash, full_name, role) "
+                + "SELECT ?, password_hash, 'Temp User', 'ADMIN' FROM app_user WHERE username = 'admin'", username);
+        browser.login(username);
+
+        jdbc.update("UPDATE app_user SET enabled = false WHERE username = ?", username);
+
+        assertThat(browser.post("/api/auth/refresh", null, Problem.class).getStatusCode())
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
+        TestBrowser again = new TestBrowser(restTemplate);
+        again.fetchCsrfCookie();
+        assertThat(again.post("/api/auth/login", credentials(username), Problem.class).getStatusCode())
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void housekeepingDeletesExpiredRefreshTokensOnly() {
+        browser.login("viewer");
+        String liveHash = sha256(browser.cookie(AuthCookies.REFRESH_COOKIE));
+        TestBrowser other = new TestBrowser(restTemplate);
+        other.login("viewer");
+        String expiredHash = sha256(other.cookie(AuthCookies.REFRESH_COOKIE));
+        jdbc.update("UPDATE refresh_token SET expires_at = now() - interval '1 day' WHERE token_hash = ?", expiredHash);
+
+        refreshTokens.deleteExpiredTokens();
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM refresh_token WHERE token_hash IN (?, ?)", Integer.class,
+                liveHash, expiredHash)).isOne();
+        assertThat(browser.post("/api/auth/refresh", null, UserBody.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
     void refreshWithoutCookieIsUnauthorized() {
         browser.fetchCsrfCookie();
 
@@ -231,6 +303,14 @@ class AuthIntegrationTest {
     void healthAndApiDocsStayPublic() {
         assertThat(restTemplate.getForEntity("/actuator/health", String.class).getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(restTemplate.getForEntity("/v3/api-docs", String.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    private static String sha256(String value) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException(exception);
+        }
     }
 
     private static Map<String, String> credentials(String username) {

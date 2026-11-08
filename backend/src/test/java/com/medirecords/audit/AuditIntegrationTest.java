@@ -81,6 +81,33 @@ class AuditIntegrationTest {
                 .containsEntry("email", new String[] {"audit." + token + "@example.com", null});
     }
 
+    /** The entry commits with the change or not at all: rejected and forbidden writes leave no trace. */
+    @Test
+    void changesThatFailRecordNothing() {
+        JsonNode created = admin.post("/api/patients", patient("Leeds"), JsonNode.class).getBody();
+        long id = created.get("id").asLong();
+        TestBrowser viewer = new TestBrowser(restTemplate);
+        viewer.login("viewer");
+        long before = dataChangeEntries();
+
+        // Duplicate email (409), validation error (400), stale version (409), forbidden role (403).
+        assertThat(admin.post("/api/patients", patient("Bath"), JsonNode.class).getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT);
+        Map<String, Object> invalid = patient("Leeds");
+        invalid.put("email", "nope");
+        invalid.put("version", 0);
+        assertThat(admin.put("/api/patients/" + id, invalid, JsonNode.class).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        Map<String, Object> stale = patient("York");
+        stale.put("version", created.get("version").asLong() + 5);
+        assertThat(admin.put("/api/patients/" + id, stale, JsonNode.class).getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT);
+        assertThat(viewer.delete("/api/patients/" + id, JsonNode.class).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        assertThat(dataChangeEntries()).isEqualTo(before);
+        assertThat(entriesFor("Patient", id)).extracting(entry -> entry.get("action").asText()).containsExactly("CREATE");
+    }
+
     @Test
     void anImportIsOneEntryWithCountsNotOneEntryPerRow() {
         // (Counts every entry: no sign-in happens between "before" and the end of the import.)
@@ -135,7 +162,9 @@ class AuditIntegrationTest {
 
     @Test
     void recordsSignInsFailedSignInsAndSignOutsWithUsernameAndTimeOnly() {
-        Instant start = Instant.now().minusSeconds(1);
+        // Baseline by id, not by time: other tests in this context sign the viewer in moments earlier,
+        // and a time window with slack would pick those events up on a fast machine.
+        long lastIdBefore = lastAuditId();
         String wrongPassword = "wrong-" + token;
         String unknownUser = "nobody-" + token;
 
@@ -145,7 +174,7 @@ class AuditIntegrationTest {
         assertThat(failedLogin("viewer", wrongPassword).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(failedLogin("  " + unknownUser + " ", wrongPassword).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
 
-        List<JsonNode> viewerEvents = entries("/api/audit-log?size=100&actor=viewer&from=" + start);
+        List<JsonNode> viewerEvents = entriesAfter(lastIdBefore, "/api/audit-log?size=100&actor=viewer");
         assertThat(viewerEvents).extracting(entry -> entry.get("action").asText())
                 .containsExactly("LOGIN_FAILED", "LOGOUT", "LOGIN_SUCCESS"); // newest first
         assertThat(viewerEvents).extracting(entry -> entry.get("summary").asText())
@@ -162,7 +191,7 @@ class AuditIntegrationTest {
         List<JsonNode> unknown = entries("/api/audit-log?size=100&actor=" + unknownUser);
         assertThat(unknown).singleElement().satisfies(entry ->
                 assertThat(entry.get("action").asText()).isEqualTo("LOGIN_FAILED"));
-        assertThat(entries("/api/audit-log?size=100&action=LOGIN_FAILED&from=" + start)).hasSize(2);
+        assertThat(entriesAfter(lastIdBefore, "/api/audit-log?size=100&action=LOGIN_FAILED")).hasSize(2);
 
         // The password is stored nowhere in the audit log, in any column.
         Integer withPassword = jdbc.queryForObject("SELECT count(*) FROM audit_log WHERE concat_ws('|', actor, "
@@ -226,8 +255,22 @@ class AuditIntegrationTest {
         return entries;
     }
 
+    /** Entries newer than {@code lastId}; the API lists newest first, so they are on the first page. */
+    private List<JsonNode> entriesAfter(long lastId, String path) {
+        return entries(path).stream().filter(entry -> entry.get("id").asLong() > lastId).toList();
+    }
+
+    private long lastAuditId() {
+        return jdbc.queryForObject("SELECT coalesce(max(id), 0) FROM audit_log", Long.class);
+    }
+
     private long totalEntries() {
         return admin.get("/api/audit-log?size=1", JsonNode.class).getBody().get("totalElements").asLong();
+    }
+
+    /** Entries other than sign-in events (the viewer's login above would otherwise count). */
+    private long dataChangeEntries() {
+        return jdbc.queryForObject("SELECT count(*) FROM audit_log WHERE entity_type <> 'Session'", Long.class);
     }
 
     private List<JsonNode> entriesFor(String entityType, long entityId) {
