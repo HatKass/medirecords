@@ -81,6 +81,33 @@ class AuditIntegrationTest {
                 .containsEntry("email", new String[] {"audit." + token + "@example.com", null});
     }
 
+    /** The entry commits with the change or not at all: rejected and forbidden writes leave no trace. */
+    @Test
+    void changesThatFailRecordNothing() {
+        JsonNode created = admin.post("/api/patients", patient("Leeds"), JsonNode.class).getBody();
+        long id = created.get("id").asLong();
+        TestBrowser viewer = new TestBrowser(restTemplate);
+        viewer.login("viewer");
+        long before = dataChangeEntries();
+
+        // Duplicate email (409), validation error (400), stale version (409), forbidden role (403).
+        assertThat(admin.post("/api/patients", patient("Bath"), JsonNode.class).getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT);
+        Map<String, Object> invalid = patient("Leeds");
+        invalid.put("email", "nope");
+        invalid.put("version", 0);
+        assertThat(admin.put("/api/patients/" + id, invalid, JsonNode.class).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        Map<String, Object> stale = patient("York");
+        stale.put("version", created.get("version").asLong() + 5);
+        assertThat(admin.put("/api/patients/" + id, stale, JsonNode.class).getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT);
+        assertThat(viewer.delete("/api/patients/" + id, JsonNode.class).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        assertThat(dataChangeEntries()).isEqualTo(before);
+        assertThat(entriesFor("Patient", id)).extracting(entry -> entry.get("action").asText()).containsExactly("CREATE");
+    }
+
     @Test
     void anImportIsOneEntryWithCountsNotOneEntryPerRow() {
         // (Counts every entry: no sign-in happens between "before" and the end of the import.)
@@ -228,6 +255,11 @@ class AuditIntegrationTest {
 
     private long totalEntries() {
         return admin.get("/api/audit-log?size=1", JsonNode.class).getBody().get("totalElements").asLong();
+    }
+
+    /** Entries other than sign-in events (the viewer's login above would otherwise count). */
+    private long dataChangeEntries() {
+        return jdbc.queryForObject("SELECT count(*) FROM audit_log WHERE entity_type <> 'Session'", Long.class);
     }
 
     private List<JsonNode> entriesFor(String entityType, long entityId) {

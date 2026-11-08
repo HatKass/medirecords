@@ -22,6 +22,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * The whole import pipeline against real Postgres: upload, asynchronous Spring Batch job, polling,
@@ -33,6 +34,12 @@ class ImportIntegrationTest {
 
     @Autowired
     private TestRestTemplate restTemplate;
+
+    @Autowired
+    private JdbcTemplate jdbc;
+
+    @Autowired
+    private ImportService importService;
 
     private TestBrowser admin;
     private String token;
@@ -172,6 +179,110 @@ class ImportIntegrationTest {
         assertThat(admin.get("/api/imports/999999", JsonNode.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
+    /** Encoding and binary problems are caught at upload: no import row, no job, a message the user can act on. */
+    @Test
+    void rejectsEmptyBinaryAndNonUtf8FilesWithoutRecordingAnImport() {
+        String header = "firstName,lastName,dateOfBirth,gender,email,city\n";
+        long importsBefore = importCount();
+
+        ResponseEntity<JsonNode> empty = admin.upload("/api/imports", "empty.csv", new byte[0], JsonNode.class);
+        assertThat(empty.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(empty.getBody().get("detail").asText()).isEqualTo("The file is empty.");
+
+        // A zip renamed to .csv: valid UTF-8 bytes, but with NUL characters no text file has.
+        ResponseEntity<JsonNode> binary = admin.upload("/api/imports", "archive.csv",
+                new byte[] {'P', 'K', 3, 4, 0, 0, 0, '\n', 1, 2}, JsonNode.class);
+        assertThat(binary.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(binary.getBody().get("detail").asText()).isEqualTo("This does not look like a text CSV file.");
+
+        // "José" saved by Excel as Windows-1252 instead of "CSV UTF-8": the 0xE9 byte is not valid UTF-8.
+        byte[] latin1 = (header + "José,Latin" + token + ",1990-01-01,M,jose." + token + "@example.com,Porto\n")
+                .getBytes(StandardCharsets.ISO_8859_1);
+        ResponseEntity<JsonNode> notUtf8 = admin.upload("/api/imports", "latin1.csv", latin1, JsonNode.class);
+        assertThat(notUtf8.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(notUtf8.getBody().get("detail").asText()).contains("not UTF-8 encoded");
+
+        assertThat(importCount()).isEqualTo(importsBefore);
+    }
+
+    /** The processor is step-scoped, so it remembers emails across chunk transactions (chunk size is 500). */
+    @Test
+    void duplicatesAreCaughtAcrossChunkBoundaries() {
+        StringBuilder csv = new StringBuilder("firstName,lastName,dateOfBirth,gender,email,city\n");
+        for (int row = 2; row <= 701; row++) {
+            String email = row == 650 ? "chunk2." + token + "@example.com" : "chunk" + row + "." + token + "@example.com";
+            csv.append("Chunk,Row").append(token).append(",1990-01-01,F,").append(email).append(",York\n");
+        }
+        long id = admin.upload("/api/imports", "chunks.csv", bytes(csv.toString()), JsonNode.class)
+                .getBody().get("id").asLong();
+
+        JsonNode finished = awaitFinished(id);
+
+        assertThat(finished.get("status").asText()).isEqualTo("COMPLETED");
+        assertThat(finished.get("totalRows").asInt()).isEqualTo(700);
+        assertThat(finished.get("validRows").asInt()).isEqualTo(699);
+        JsonNode error = admin.get("/api/imports/" + id + "/errors", JsonNode.class).getBody().get("content").get(0);
+        assertThat(error.get("rowNumber").asInt()).isEqualTo(650);
+        assertThat(error.get("reason").asText()).isEqualTo(
+                "Duplicate email chunk2." + token + "@example.com (already used on row 2)");
+    }
+
+    @Test
+    void rejectsImplausibleBirthDatesAndKeepsNonAsciiTextIntact() {
+        String csv = "firstName,lastName,dateOfBirth,gender,email,city\n"
+                + "Zoë,Ñúñez" + token + ",1985-02-03,F,zoe." + token + "@example.com,São Paulo\n"   // row 2: valid
+                + "Old,Typo" + token + ",1880-05-06,M,old." + token + "@example.com,York\n"         // row 3: before 1900
+                + "Not,Born" + token + ",2999-01-01,F,unborn." + token + "@example.com,York\n";     // row 4: future
+        long id = admin.upload("/api/imports", "dates.csv", bytes(csv), JsonNode.class).getBody().get("id").asLong();
+
+        JsonNode finished = awaitFinished(id);
+
+        assertThat(finished.get("validRows").asInt()).isEqualTo(1);
+        JsonNode zoe = admin.get("/api/patients?name=Ñúñez" + token, JsonNode.class).getBody().get("content").get(0);
+        assertThat(zoe.get("firstName").asText()).isEqualTo("Zoë");
+        assertThat(zoe.get("city").asText()).isEqualTo("São Paulo");
+        Map<Integer, String> reasons = new HashMap<>();
+        admin.get("/api/imports/" + id + "/errors", JsonNode.class).getBody().get("content")
+                .forEach(error -> reasons.put(error.get("rowNumber").asInt(), error.get("reason").asText()));
+        assertThat(reasons).containsOnlyKeys(3, 4);
+        assertThat(reasons.get(3)).isEqualTo("Date of birth 1880-05-06 is before 1900");
+        assertThat(reasons.get(4)).startsWith("Date of birth '2999-01-01'");
+    }
+
+    /** Old browsers send the full client path; it must never reach the history (or the file system). */
+    @Test
+    void keepsOnlyTheBaseNameOfTheUploadedFile() {
+        String csv = "firstName,lastName,dateOfBirth,gender,email,city\nA,Path" + token + ",1990-01-01,F,path."
+                + token + "@example.com,York\n";
+
+        JsonNode windows = admin.upload("/api/imports", "C:\\Users\\clinic\\Desktop\\export.csv", bytes(csv),
+                JsonNode.class).getBody();
+        JsonNode traversal = admin.upload("/api/imports", "../../etc/cron.d/evil.csv", bytes(csv), JsonNode.class)
+                .getBody();
+
+        assertThat(windows.get("fileName").asText()).isEqualTo("export.csv");
+        assertThat(traversal.get("fileName").asText()).isEqualTo("evil.csv");
+        awaitFinished(windows.get("id").asLong());
+        awaitFinished(traversal.get("id").asLong());
+    }
+
+    @Test
+    void importsCutOffByARestartAreMarkedFailedAndAudited() {
+        long id = jdbc.queryForObject("INSERT INTO patient_import (file_name, source_header, status, imported_by, "
+                + "expected_rows, valid_rows, started_at) VALUES ('cut-off-" + token + ".csv', 'h', 'RUNNING', 'admin', "
+                + "1000, 400, now()) RETURNING id", Long.class);
+
+        importService.failInterruptedImports();
+
+        JsonNode failed = admin.get("/api/imports/" + id, JsonNode.class).getBody();
+        assertThat(failed.get("status").asText()).isEqualTo("FAILED");
+        assertThat(failed.get("validRows").asInt()).as("rows already imported are kept").isEqualTo(400);
+        assertThat(failed.get("failureMessage").asText()).contains("interrupted by a server restart");
+        assertThat(failed.get("finishedAt").isTextual()).isTrue();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM audit_log WHERE entity_type = 'Import' AND entity_id = ? "
+                + "AND action = 'IMPORT'", Integer.class, id)).isOne();
+    }
+
     @Test
     void viewersCanReadHistoryButNotUpload() {
         TestBrowser viewer = new TestBrowser(restTemplate);
@@ -199,6 +310,10 @@ class ImportIntegrationTest {
     private static String line(String email, String first, String last, String dob, String gender, String city,
             String phone, String blood) {
         return String.join(",", email, first, last, dob, gender, city, phone, blood) + "\r\n";
+    }
+
+    private long importCount() {
+        return jdbc.queryForObject("SELECT count(*) FROM patient_import", Long.class);
     }
 
     private static byte[] bytes(String text) {

@@ -18,6 +18,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -79,6 +80,77 @@ class PatientIntegrationTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
         assertThat(fieldsWithErrors(response.getBody())).contains("firstName", "email", "dateOfBirth", "phone");
+    }
+
+    @Test
+    void emptyBodyReportsEveryRequiredFieldWithAReadableMessage() {
+        ResponseEntity<JsonNode> response = admin.post("/api/patients", Map.of(), JsonNode.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        JsonNode problem = response.getBody();
+        assertThat(problem.get("title").asText()).isEqualTo("Validation failed");
+        assertThat(fieldsWithErrors(problem))
+                .containsExactlyInAnyOrder("firstName", "lastName", "dateOfBirth", "gender", "email", "city");
+        problem.get("errors").forEach(error -> assertThat(error.get("message").asText()).isNotBlank());
+    }
+
+    @Test
+    void overlongValuesAreRejectedPerField() {
+        Map<String, Object> body = patient("a".repeat(101), "Doe", "c".repeat(101));
+        body.put("email", "a".repeat(250) + "@example.com");
+
+        ResponseEntity<JsonNode> response = admin.post("/api/patients", body, JsonNode.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(fieldsWithErrors(response.getBody())).contains("firstName", "city", "email")
+                .doesNotContain("lastName");
+    }
+
+    /** Framework errors use the same ProblemDetail shape and never echo parser or class internals. */
+    @Test
+    void malformedRequestsAreProblemDetailsWithoutInternals() {
+        ResponseEntity<String> badJson = admin.post("/api/patients", "{\"firstName\": ", String.class);
+        assertThat(badJson.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(badJson.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
+        assertThat(badJson.getBody()).doesNotContain("Exception").doesNotContain("jackson").doesNotContain("at [Source");
+
+        ResponseEntity<String> badDate = admin.post("/api/patients",
+                Map.of("firstName", "A", "lastName", "B", "dateOfBirth", "31/12/1980"), String.class);
+        assertThat(badDate.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(badDate.getBody()).doesNotContain("Exception");
+
+        ResponseEntity<String> badId = admin.get("/api/patients/abc", String.class);
+        assertThat(badId.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(badId.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
+        assertThat(badId.getBody()).doesNotContain("NumberFormatException");
+
+        ResponseEntity<String> wrongMethod = admin.sendWithCsrfHeader(HttpMethod.PATCH, "/api/patients/1", Map.of(),
+                String.class, admin.cookie("XSRF-TOKEN"));
+        assertThat(wrongMethod.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+        assertThat(wrongMethod.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
+    }
+
+    @Test
+    void updatingAMissingPatientIsNotFound() {
+        Map<String, Object> body = patient("Ghost", "Patient", "Leeds");
+        body.put("version", 0);
+
+        ResponseEntity<JsonNode> response = admin.put("/api/patients/999999999", body, JsonNode.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void changingTheEmailToAnotherPatientsEmailIsConflict() {
+        JsonNode first = create(patient("Eve", "One" + token, "Leeds"));
+        JsonNode second = create(patient("Eve", "Two" + token, "Leeds"));
+        Map<String, Object> edit = patient("Eve", "Two" + token, "Leeds");
+        edit.put("email", first.get("email").asText().toUpperCase());
+        edit.put("version", second.get("version").asLong());
+
+        ResponseEntity<JsonNode> response = admin.put("/api/patients/" + second.get("id").asLong(), edit, JsonNode.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     }
 
     @Test
