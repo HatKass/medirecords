@@ -56,10 +56,22 @@ info:
 
 springdoc:
   swagger-ui:
+    csrf:
+      enabled: true               # Swagger UI echoes the XSRF-TOKEN cookie as X-XSRF-TOKEN on writes.
     operations-sorter: method
     tags-sorter: alpha
 
 app:
   version: ${APP_VERSION:0.1.0}
-  cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+  security:
+    jwt:
+      # Dev-only default. Set JWT_SECRET (>= 32 bytes, e.g. `openssl rand -base64 48`) in any real deployment.
+      secret: ${JWT_SECRET:dev-only-insecure-secret-change-me-0123456789}
+      ttl: ${JWT_TTL:PT15M}            # access token (mr_access cookie)
+      issuer: ${JWT_ISSUER:medirecords}
+    refresh-token:
+      ttl: ${REFRESH_TOKEN_TTL:P7D}    # refresh token (mr_refresh cookie); rotated on every use
+    cookie:
+      # Secure cookies are only sent over HTTPS. Keep true in production; set COOKIE_SECURE=false for
+      # plain-HTTP local runs in browsers that do not treat http://localhost as secure (e.g. Safari).
+      secure: ${COOKIE_SECURE:true}

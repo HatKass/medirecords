@@ -5,36 +5,28 @@ import { HealthResponse, HealthService } from '../../core/health/health.service'
 type LoadState = 'loading' | 'ready' | 'error';
 
 /**
- * Phase 1 landing page: proves the full chain browser → frontend → backend → database works.
- * It will be replaced by the login page and dashboard in later phases.
+ * Shows the backend health check, proving the chain browser → frontend → backend → database.
+ * Health is a public endpoint, so this page works even if the token has just expired.
  */
 @Component({
   selector: 'mr-status-page',
   template: `
-    <main class="mx-auto flex min-h-screen max-w-xl flex-col justify-center px-4 py-12">
-      <div class="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-        <div class="flex items-center gap-3">
-          <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-600 font-bold text-white">M</div>
-          <div>
-            <h1 class="text-xl font-semibold">MediRecords</h1>
-            <p class="text-sm text-slate-500">Patient records management</p>
-          </div>
-        </div>
-
-        <h2 class="mt-8 text-sm font-medium uppercase tracking-wide text-slate-500">System status</h2>
-
+    <h1 class="text-2xl font-semibold tracking-tight">System status</h1>
+    <p class="mt-1 text-sm text-slate-500">Live health of the API and its database.</p>
+    <div class="mt-6 max-w-xl">
+      <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         @switch (state()) {
           @case ('loading') {
-            <p class="mt-3 animate-pulse text-slate-500">Checking backend…</p>
+            <p class="animate-pulse text-slate-500">Checking backend…</p>
           }
           @case ('error') {
-            <div class="mt-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <div class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
               <p class="font-medium">Backend unreachable</p>
               <p class="mt-1">{{ errorMessage() }}</p>
             </div>
           }
           @case ('ready') {
-            <ul class="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-200">
+            <ul class="divide-y divide-slate-100 rounded-lg border border-slate-200">
               <li class="flex items-center justify-between px-4 py-3">
                 <span>Backend API</span>
                 <span [class]="badgeClass(health()?.status)">{{ health()?.status }}</span>
@@ -61,7 +53,7 @@ type LoadState = 'loading' | 'ready' | 'error';
           </button>
         </div>
       </div>
-    </main>
+    </div>
   `,
 })
 export class StatusPage implements OnInit {
