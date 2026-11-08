@@ -104,7 +104,8 @@ the same database (a second import of the sample rejects every row as a duplicat
 
 ## CI
 
-`.github/workflows/ci.yml` runs on every push and pull request:
+`.github/workflows/ci.yml` runs on every pull request and on pushes to `main` (so a branch with an open
+PR is checked once, not once for the push and again for the PR):
 
 1. **backend**: `./mvnw verify` (Testcontainers uses the runner's Docker); coverage table in the job
    summary; Surefire and JaCoCo reports uploaded as an artifact.

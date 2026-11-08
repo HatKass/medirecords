@@ -162,7 +162,9 @@ class AuditIntegrationTest {
 
     @Test
     void recordsSignInsFailedSignInsAndSignOutsWithUsernameAndTimeOnly() {
-        Instant start = Instant.now().minusSeconds(1);
+        // Baseline by id, not by time: other tests in this context sign the viewer in moments earlier,
+        // and a time window with slack would pick those events up on a fast machine.
+        long lastIdBefore = lastAuditId();
         String wrongPassword = "wrong-" + token;
         String unknownUser = "nobody-" + token;
 
@@ -172,7 +174,7 @@ class AuditIntegrationTest {
         assertThat(failedLogin("viewer", wrongPassword).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(failedLogin("  " + unknownUser + " ", wrongPassword).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
 
-        List<JsonNode> viewerEvents = entries("/api/audit-log?size=100&actor=viewer&from=" + start);
+        List<JsonNode> viewerEvents = entriesAfter(lastIdBefore, "/api/audit-log?size=100&actor=viewer");
         assertThat(viewerEvents).extracting(entry -> entry.get("action").asText())
                 .containsExactly("LOGIN_FAILED", "LOGOUT", "LOGIN_SUCCESS"); // newest first
         assertThat(viewerEvents).extracting(entry -> entry.get("summary").asText())
@@ -189,7 +191,7 @@ class AuditIntegrationTest {
         List<JsonNode> unknown = entries("/api/audit-log?size=100&actor=" + unknownUser);
         assertThat(unknown).singleElement().satisfies(entry ->
                 assertThat(entry.get("action").asText()).isEqualTo("LOGIN_FAILED"));
-        assertThat(entries("/api/audit-log?size=100&action=LOGIN_FAILED&from=" + start)).hasSize(2);
+        assertThat(entriesAfter(lastIdBefore, "/api/audit-log?size=100&action=LOGIN_FAILED")).hasSize(2);
 
         // The password is stored nowhere in the audit log, in any column.
         Integer withPassword = jdbc.queryForObject("SELECT count(*) FROM audit_log WHERE concat_ws('|', actor, "
@@ -251,6 +253,15 @@ class AuditIntegrationTest {
         List<JsonNode> entries = new ArrayList<>();
         response.getBody().get("content").forEach(entries::add);
         return entries;
+    }
+
+    /** Entries newer than {@code lastId}; the API lists newest first, so they are on the first page. */
+    private List<JsonNode> entriesAfter(long lastId, String path) {
+        return entries(path).stream().filter(entry -> entry.get("id").asLong() > lastId).toList();
+    }
+
+    private long lastAuditId() {
+        return jdbc.queryForObject("SELECT coalesce(max(id), 0) FROM audit_log", Long.class);
     }
 
     private long totalEntries() {

@@ -1,7 +1,10 @@
 name: CI
 
+# Pull requests are checked on their own event; pushes are checked only on main (merges), so a
+# branch with an open PR is not tested twice.
 on:
   push:
+    branches: [main]
   pull_request:
 
 # A newer push to the same branch or PR makes the running checks obsolete.
