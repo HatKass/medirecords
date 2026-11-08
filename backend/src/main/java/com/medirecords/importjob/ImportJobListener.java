@@ -20,11 +20,13 @@ class ImportJobListener implements JobExecutionListener {
 
     private final PatientImportRepository imports;
     private final ImportFileStorage storage;
+    private final ImportAudit audit;
     private final Clock clock;
 
-    ImportJobListener(PatientImportRepository imports, ImportFileStorage storage, Clock clock) {
+    ImportJobListener(PatientImportRepository imports, ImportFileStorage storage, ImportAudit audit, Clock clock) {
         this.imports = imports;
         this.storage = storage;
+        this.audit = audit;
         this.clock = clock;
     }
 
@@ -43,6 +45,7 @@ class ImportJobListener implements JobExecutionListener {
         } else {
             patientImport.markFailed(failureMessage(execution.getAllFailureExceptions()), clock.instant());
         }
+        audit.recordFinished(patientImport);
         log.info("Import {} ({}) finished: {}, {} valid, {} invalid rows", patientImport.getId(),
                 patientImport.getFileName(), patientImport.getStatus(), patientImport.getValidRows(),
                 patientImport.getInvalidRows());

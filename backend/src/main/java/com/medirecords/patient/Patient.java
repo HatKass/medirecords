@@ -81,6 +81,16 @@ public class Patient {
         this.bloodType = details.bloodType();
     }
 
+    /** Snapshot of the editable fields, e.g. to audit what an update changed. */
+    PatientDetails details() {
+        return new PatientDetails(firstName, lastName, dateOfBirth, gender, email, phone, city, bloodType);
+    }
+
+    /** "Jane Doe", for audit summaries. */
+    String displayName() {
+        return firstName + " " + lastName;
+    }
+
     public Long getId() {
         return id;
     }

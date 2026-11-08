@@ -26,6 +26,12 @@ const NAV_ITEMS: NavItem[] = [
     roles: ['ADMIN'],
   },
   { label: 'Import history', path: '/imports', icon: 'M12 8v4l3 2M3.05 11a9 9 0 1 1 .5 4M3 4v5h5' },
+  {
+    label: 'Audit log',
+    path: '/audit-log',
+    icon: 'M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2M9 13l2 2 4-4',
+    roles: ['ADMIN'],
+  },
   { label: 'System status', path: '/status', icon: 'M4 13h4l3-8 3 14 3-6h3' },
 ];
 
