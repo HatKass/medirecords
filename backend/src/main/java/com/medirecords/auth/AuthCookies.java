@@ -21,8 +21,8 @@ public class AuthCookies {
 
     public static final String ACCESS_COOKIE = "mr_access";
     public static final String REFRESH_COOKIE = "mr_refresh";
-    static final String ACCESS_PATH = "/api";
-    static final String REFRESH_PATH = "/api/auth/refresh";
+    public static final String ACCESS_PATH = "/api";
+    public static final String REFRESH_PATH = "/api/auth/refresh";
 
     private final CookieProperties properties;
     private final Clock clock;

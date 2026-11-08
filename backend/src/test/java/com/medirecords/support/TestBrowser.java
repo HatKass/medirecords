@@ -1,5 +1,6 @@
-package com.medirecords.auth;
+package com.medirecords.support;
 
+import com.medirecords.auth.AuthCookies;
 import java.net.HttpCookie;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -17,19 +18,19 @@ import org.springframework.http.ResponseEntity;
  * Minimal browser stand-in for tests: keeps cookies from Set-Cookie headers, sends each one only to
  * paths under its Path attribute, and (like Angular) copies XSRF-TOKEN into X-XSRF-TOKEN on writes.
  */
-class TestBrowser {
+public class TestBrowser {
 
     private record StoredCookie(String value, String path) {}
 
     private final TestRestTemplate restTemplate;
     private final Map<String, StoredCookie> cookies = new LinkedHashMap<>();
 
-    TestBrowser(TestRestTemplate restTemplate) {
+    public TestBrowser(TestRestTemplate restTemplate) {
         this.restTemplate = restTemplate;
     }
 
     /** Raw Set-Cookie header for the named cookie, or fails if the response did not set it. */
-    static String setCookie(ResponseEntity<?> response, String name) {
+    public static String setCookie(ResponseEntity<?> response, String name) {
         List<String> headers = response.getHeaders().getOrEmpty(HttpHeaders.SET_COOKIE);
         return headers.stream()
                 .filter(header -> header.startsWith(name + "="))
@@ -37,11 +38,11 @@ class TestBrowser {
                 .orElseThrow(() -> new AssertionError("No Set-Cookie for " + name + " in " + headers));
     }
 
-    void fetchCsrfCookie() {
+    public void fetchCsrfCookie() {
         get("/api/auth/me", String.class);
     }
 
-    ResponseEntity<String> login(String username) {
+    public ResponseEntity<String> login(String username) {
         if (cookie("XSRF-TOKEN") == null) {
             fetchCsrfCookie();
         }
@@ -53,32 +54,40 @@ class TestBrowser {
         return response;
     }
 
-    <T> ResponseEntity<T> get(String path, Class<T> type) {
+    public <T> ResponseEntity<T> get(String path, Class<T> type) {
         return send(HttpMethod.GET, path, null, type, false);
     }
 
-    <T> ResponseEntity<T> post(String path, Object body, Class<T> type) {
+    public <T> ResponseEntity<T> post(String path, Object body, Class<T> type) {
         return send(HttpMethod.POST, path, body, type, true);
     }
 
-    <T> ResponseEntity<T> postWithoutCsrf(String path, Object body, Class<T> type) {
+    public <T> ResponseEntity<T> postWithoutCsrf(String path, Object body, Class<T> type) {
         return send(HttpMethod.POST, path, body, type, false);
     }
 
-    String cookie(String name) {
+    public <T> ResponseEntity<T> put(String path, Object body, Class<T> type) {
+        return send(HttpMethod.PUT, path, body, type, true);
+    }
+
+    public <T> ResponseEntity<T> delete(String path, Class<T> type) {
+        return send(HttpMethod.DELETE, path, null, type, true);
+    }
+
+    public String cookie(String name) {
         StoredCookie cookie = cookies.get(name);
         return cookie == null ? null : cookie.value();
     }
 
     /** Overwrites a cookie's value, keeping the path the server gave it. */
-    void setCookie(String name, String value) {
+    public void setCookie(String name, String value) {
         StoredCookie existing = cookies.get(name);
         String path = existing != null ? existing.path()
                 : name.equals(AuthCookies.REFRESH_COOKIE) ? AuthCookies.REFRESH_PATH : AuthCookies.ACCESS_PATH;
         cookies.put(name, new StoredCookie(value, path));
     }
 
-    void removeCookie(String name) {
+    public void removeCookie(String name) {
         cookies.remove(name);
     }
 

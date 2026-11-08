@@ -3,6 +3,7 @@ package com.medirecords.auth;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.medirecords.TestcontainersConfiguration;
+import com.medirecords.support.TestBrowser;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
