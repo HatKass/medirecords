@@ -27,6 +27,11 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-medirecords}
       DB_USERNAME: ${POSTGRES_USER:-medirecords}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-medirecords}
+      JWT_SECRET: ${JWT_SECRET:-dev-only-insecure-secret-change-me-0123456789}
+      JWT_TTL: ${JWT_TTL:-PT15M}
+      REFRESH_TOKEN_TTL: ${REFRESH_TOKEN_TTL:-P7D}
+      # The stack is served over plain HTTP on localhost; use true behind HTTPS.
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
     ports:
       - "${BACKEND_HOST_PORT:-8080}:8080"
     depends_on:
