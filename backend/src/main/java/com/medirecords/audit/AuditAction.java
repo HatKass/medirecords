@@ -10,9 +10,14 @@ public enum AuditAction {
     LOGIN_SUCCESS,
     /** The actor is the username that was typed, which may not be an existing account. */
     LOGIN_FAILED,
+    /**
+     * Sign-in refused by the rate limiter, recorded once per block (not for every refused attempt);
+     * details hold the client address and the wait.
+     */
+    LOGIN_BLOCKED,
     LOGOUT;
 
     public boolean isAuthentication() {
-        return this == LOGIN_SUCCESS || this == LOGIN_FAILED || this == LOGOUT;
+        return this == LOGIN_SUCCESS || this == LOGIN_FAILED || this == LOGIN_BLOCKED || this == LOGOUT;
     }
 }

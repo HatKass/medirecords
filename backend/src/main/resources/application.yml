@@ -81,6 +81,12 @@ app:
       issuer: ${JWT_ISSUER:medirecords}
     refresh-token:
       ttl: ${REFRESH_TOKEN_TTL:P7D}    # refresh token (mr_refresh cookie); rotated on every use
+    login-rate-limit:
+      # Failed sign-ins allowed per sliding window before POST /api/auth/login answers 429.
+      window: ${LOGIN_RATE_LIMIT_WINDOW:PT15M}
+      max-failures-per-username-and-ip: ${LOGIN_MAX_FAILURES:5}
+      max-failures-per-ip: ${LOGIN_MAX_FAILURES_PER_IP:20}            # many usernames from one client
+      max-failures-per-username: ${LOGIN_MAX_FAILURES_PER_USERNAME:50} # one account from many clients
     cookie:
       # Secure cookies are only sent over HTTPS. Keep true in production; set COOKIE_SECURE=false for
       # plain-HTTP local runs in browsers that do not treat http://localhost as secure (e.g. Safari).

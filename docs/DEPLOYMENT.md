@@ -82,6 +82,14 @@ already honours (`server.port: ${PORT:8080}`).
 | `SERVER_TOMCAT_THREADS_MAX` | `40` | default 200 threads would reserve stack memory needlessly |
 | `HEALTH_SHOW_DETAILS` | `never` | don't expose database details on a public URL |
 | `JWT_TTL` / `REFRESH_TOKEN_TTL` | optional, defaults `PT15M` / `P7D` | |
+| `LOGIN_MAX_FAILURES` / `LOGIN_MAX_FAILURES_PER_IP` / `LOGIN_MAX_FAILURES_PER_USERNAME` / `LOGIN_RATE_LIMIT_WINDOW` | optional, defaults `5` / `20` / `50` / `PT15M` | sign-in rate limiting |
+
+The login rate limiter takes the client address from `X-Forwarded-For` (the leftmost value, via
+`server.forward-headers-strategy: framework`). Behind Vercel that is the address Vercel reports.
+Requests sent straight to the `onrender.com` URL can carry a forged header; the per-username limit
+still applies to them. After deploying, sign in wrongly a few times and check that the
+`LOGIN_FAILED` / `LOGIN_BLOCKED` entries in the audit log show your real address, not a proxy's
+(if every client shared one proxy address, the per-address limit would block everyone at once).
 
 Mark `DB_PASSWORD` and `JWT_SECRET` as secret (or put them in a Render environment group).
 

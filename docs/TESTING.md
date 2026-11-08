@@ -27,6 +27,8 @@ What the backend tests cover:
 | `AccessRulesIntegrationTest` | Role matrix over every API endpoint (anonymous / VIEWER / ADMIN); expired, foreign-issuer, wrongly signed and unsigned JWTs; unlisted paths denied |
 | `CsrfIntegrationTest` | Every state-changing endpoint rejects a missing, wrong or cookie-less CSRF token, with no side effect |
 | `AuthIntegrationTest` | Cookie flags, login/logout, refresh rotation and replay detection, expired/unknown refresh tokens, disabled accounts |
+| `LoginRateLimitIntegrationTest` | 5 failures then `429` + `Retry-After` even with the right password, one `LOGIN_BLOCKED` audit entry per block, block scoped to username + address, reset on success, password spraying from one address, invalid requests not counted |
+| `LoginRateLimiterTest` | Sliding-window rules with a controllable clock: expiry, per-address and per-username limits, case-insensitive usernames, block reported once, purge |
 | `PatientIntegrationTest` | CRUD, normalization, validation errors (ProblemDetail, no internals leaked), optimistic locking, duplicates, filters, paging |
 | `ImportIntegrationTest` | The Spring Batch pipeline end to end: messy rows, per-row reasons, error report round trip, encoding/binary/empty files, duplicates across chunks, restart recovery |
 | `ImportServiceTest` | Mockito unit test: a full worker queue answers 503 and records the import as failed |

@@ -158,5 +158,6 @@ function safeReturnUrl(url: string | undefined): string {
 function loginErrorMessage(error: HttpErrorResponse): string {
   if (error.status === 0) return 'Cannot reach the server. Is the backend running?';
   if (error.status === 401) return error.error?.detail ?? 'Invalid username or password.';
+  if (error.status === 429) return error.error?.detail ?? 'Too many failed sign-in attempts. Try again later.';
   return 'Sign-in failed. Please try again.';
 }

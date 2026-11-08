@@ -38,6 +38,7 @@ tests and CI, and it runs locally with one command.
 - Sign-in with a short-lived JWT (15 min) in an **HttpOnly, SameSite=Lax cookie**, never readable by JavaScript
 - Rotating refresh tokens (7 days), stored hashed, with **replay detection** (a reused token revokes its whole family)
 - **CSRF protection** (double-submit cookie, supported natively by Angular)
+- **Sign-in rate limiting:** after 5 failed attempts for a username from one address within 15 minutes, further attempts get `429` with `Retry-After` (the password is not even checked); wider limits per address and per username, and every block is audited
 - Two roles: **ADMIN** (full access) and **VIEWER** (read-only); enforced on the API and reflected in the UI (route guards, hidden actions)
 - Session restored on reload; on a `401` the interceptor refreshes once and retries, then sends the user to sign-in and back to the page they wanted
 
@@ -54,7 +55,7 @@ tests and CI, and it runs locally with one command.
 - Import history (status, total / valid / invalid counts, timing) and a downloadable **error report CSV** that can be fixed and re-uploaded as is
 
 **Audit log** (ADMIN only)
-- Every create / update / delete with **field-level old → new values**, one entry per import with its counts, and sign-in / failed sign-in / sign-out events
+- Every create / update / delete with **field-level old → new values**, one entry per import with its counts, and sign-in / failed sign-in / blocked sign-in / sign-out events
 - Written in the same transaction as the change; the table is **append-only** (enforced by a database trigger)
 - Filters by user, action and date range, kept in the URL
 
@@ -101,7 +102,7 @@ flowchart LR
         Pool[["import-* thread pool"]]
     end
 
-    DB[("PostgreSQL 16<br/>Flyway migrations V1–V9")]
+    DB[("PostgreSQL 16<br/>Flyway migrations V1–V10")]
 
     SPA -- "HTML / JS" --> Static
     SPA -- "fetch with cookies + X-XSRF-TOKEN" --> Proxy
@@ -270,6 +271,23 @@ from CSRF; that exemption is undone, since our token comes from a cookie. Refres
 opaque, rotated on every use, stored as SHA-256 hashes, and grouped in families so a replayed token
 revokes the whole session.
 
+### Sign-in rate limiting: three sliding windows, in memory
+
+Failed sign-ins are counted over a 15-minute sliding window under three keys: **username + client
+address** (5 failures: the everyday rule), **address** (20: one client trying many usernames) and
+**username** (50: one account attacked from many addresses, including clients forging
+`X-Forwarded-For`). Keying the main rule on the pair means nobody can lock the `admin` demo account
+out from somewhere else with five bad guesses; the wider per-username limit is the backstop.
+
+A blocked attempt is refused **before** the password is checked, so it reveals nothing, and the
+`429` message does not say which limit was hit. A successful sign-in clears only that user's own
+counter. The first refusal of each block is audited as `LOGIN_BLOCKED` with the client address and
+the wait; later refusals in the same block are not, so a client hammering away cannot flood the
+append-only audit table. The counters live in memory (bounded, purged every 5 minutes) because the
+app runs as one instance; a Redis-backed limiter would be the next step for several. Limits are
+configurable (`LOGIN_MAX_FAILURES`, `LOGIN_MAX_FAILURES_PER_IP`, `LOGIN_MAX_FAILURES_PER_USERNAME`,
+`LOGIN_RATE_LIMIT_WINDOW`).
+
 ### Same origin everywhere, no CORS
 
 nginx (Docker), the Angular dev-server proxy and Vercel rewrites all serve the API under the app's
@@ -292,7 +310,13 @@ This is a portfolio project, not a production medical system. Known limits, on p
   managed by the app, data-retention rules, consent, access reviews). All data is fictional; do
   not store real patient data.
 - **Demo accounts with public passwords**, seeded by a migration. There is no user management,
-  password change or reset, MFA, or account lockout, and no rate limiting on sign-in.
+  password change or reset, or MFA.
+- **Sign-in rate limiting is basic.** Counters are kept in memory: they reset on restart and are not
+  shared between instances. The client address comes from `X-Forwarded-For` as the proxy in front
+  reports it, so the per-address limits are only as trustworthy as that proxy (nginx in Docker
+  overwrites the header; a client calling the Render URL directly can forge it, which only the
+  per-username limit then stops). Reaching the per-username limit (50 failures in 15 minutes)
+  blocks the real user too. There is no CAPTCHA, and other endpoints are not rate limited.
 - **Single backend instance.** Import jobs run in-process; on start-up, imports left `QUEUED`/
   `RUNNING` are marked failed, which assumes one instance. Scaling out would need a job owner
   column or a remote job queue.

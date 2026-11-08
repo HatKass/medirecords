@@ -13,6 +13,7 @@ import {
   AuditEntry,
   AuditQuery,
   actionLabel,
+  blockedMinutes,
   displayValue,
   fieldLabel,
   isAuthenticationEvent,
@@ -248,9 +249,13 @@ type LoadResult = { page: Page<AuditEntry> } | { error: string } | { invalidRang
         </a>
       } @else if (isAuthEvent(entry.action)) {
         <p class="text-sm text-slate-500">
-          {{ entry.action === 'LOGIN_FAILED' ? 'Username as typed' : 'User' }}: <span class="font-medium text-slate-700">{{ entry.actor }}</span>
+          {{ entry.action === 'LOGIN_FAILED' || entry.action === 'LOGIN_BLOCKED' ? 'Username as typed' : 'User' }}: <span class="font-medium text-slate-700">{{ entry.actor }}</span>
           · {{ entry.occurredAt | date: 'MMM d, y, HH:mm:ss.SSS' }}.
-          Sign-in events record only the username and the time, never a password.
+          @if (entry.action === 'LOGIN_BLOCKED') {
+            Further attempts from <span class="font-medium text-slate-700">{{ entry.details.clientIp }}</span> were refused
+            for {{ blockedMinutes(entry.details.retryAfterSeconds) }} after too many failed sign-ins (recorded once per block).
+          }
+          Sign-in events never record a password.
         </p>
       } @else if (entry.changes.length > 0) {
         <table class="w-full max-w-3xl overflow-hidden rounded-lg border border-slate-200 bg-white text-sm">
@@ -369,6 +374,10 @@ export class AuditLogPage {
 
   protected isAuthEvent(action: AuditAction): boolean {
     return isAuthenticationEvent(action);
+  }
+
+  protected blockedMinutes(retryAfterSeconds: number | undefined): string {
+    return blockedMinutes(retryAfterSeconds);
   }
 
   protected label(action: AuditAction): string {

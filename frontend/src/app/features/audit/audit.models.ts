@@ -1,6 +1,6 @@
 import { BloodType, Gender, bloodTypeLabel, genderLabel } from '../patients/patient.models';
 
-export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'IMPORT' | 'LOGIN_SUCCESS' | 'LOGIN_FAILED' | 'LOGOUT';
+export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'IMPORT' | 'LOGIN_SUCCESS' | 'LOGIN_FAILED' | 'LOGIN_BLOCKED' | 'LOGOUT';
 
 export const AUDIT_ACTIONS: { value: AuditAction; label: string }[] = [
   { value: 'CREATE', label: 'Created' },
@@ -9,12 +9,19 @@ export const AUDIT_ACTIONS: { value: AuditAction; label: string }[] = [
   { value: 'IMPORT', label: 'Imported' },
   { value: 'LOGIN_SUCCESS', label: 'Signed in' },
   { value: 'LOGIN_FAILED', label: 'Failed sign-in' },
+  { value: 'LOGIN_BLOCKED', label: 'Sign-in blocked' },
   { value: 'LOGOUT', label: 'Signed out' },
 ];
 
-/** Sign-in events: only the username and the time are recorded. */
+/** Sign-in events: the username and the time (and, for a block, the client address). */
 export function isAuthenticationEvent(action: AuditAction): boolean {
-  return action === 'LOGIN_SUCCESS' || action === 'LOGIN_FAILED' || action === 'LOGOUT';
+  return action === 'LOGIN_SUCCESS' || action === 'LOGIN_FAILED' || action === 'LOGIN_BLOCKED' || action === 'LOGOUT';
+}
+
+/** Facts recorded with a LOGIN_BLOCKED entry. */
+export interface LoginBlockedDetails {
+  clientIp: string;
+  retryAfterSeconds: number;
 }
 
 export interface FieldChange {
@@ -46,7 +53,7 @@ export interface AuditEntry {
   entityId: number | null;
   summary: string;
   changes: FieldChange[];
-  details: Partial<ImportAuditDetails> & Record<string, unknown>;
+  details: Partial<ImportAuditDetails> & Partial<LoginBlockedDetails> & Record<string, unknown>;
 }
 
 /** Filters as the page keeps them (and puts in the URL); dates are local calendar days, yyyy-mm-dd. */
@@ -66,8 +73,15 @@ export const ACTION_BADGE: Record<AuditAction, string> = {
   IMPORT: 'bg-violet-50 text-violet-700 ring-violet-600/20',
   LOGIN_SUCCESS: 'bg-slate-50 text-slate-700 ring-slate-500/20',
   LOGIN_FAILED: 'bg-amber-50 text-amber-800 ring-amber-600/30',
+  LOGIN_BLOCKED: 'bg-rose-50 text-rose-700 ring-rose-600/30',
   LOGOUT: 'bg-slate-50 text-slate-500 ring-slate-400/20',
 };
+
+/** How long a sign-in block lasted, in words: 840 s → "14 minutes" (rounded up, at least 1). */
+export function blockedMinutes(retryAfterSeconds: number | undefined): string {
+  const minutes = Math.max(1, Math.ceil((retryAfterSeconds ?? 0) / 60));
+  return minutes === 1 ? '1 minute' : `${minutes} minutes`;
+}
 
 export function actionLabel(action: AuditAction): string {
   return AUDIT_ACTIONS.find((item) => item.value === action)?.label ?? action;

@@ -83,6 +83,15 @@ public class AuditService {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordAuthentication(AuditAction action, String username) {
+        recordAuthentication(action, username, Map.of());
+    }
+
+    /**
+     * As {@link #recordAuthentication(AuditAction, String)}, with extra facts; used for
+     * {@link AuditAction#LOGIN_BLOCKED} (client address and how long it is blocked). Never a password.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordAuthentication(AuditAction action, String username, Map<String, Object> details) {
         if (!action.isAuthentication()) {
             throw new IllegalArgumentException(action + " is not an authentication event");
         }
@@ -93,10 +102,11 @@ public class AuditService {
         String summary = switch (action) {
             case LOGIN_SUCCESS -> "Signed in";
             case LOGIN_FAILED -> "Failed sign-in attempt";
+            case LOGIN_BLOCKED -> "Sign-in blocked after too many failed attempts";
             case LOGOUT -> "Signed out";
             default -> throw new IllegalStateException();
         };
-        record(actor, action, AUTH_ENTITY, null, summary, List.of(), Map.of());
+        record(actor, action, AUTH_ENTITY, null, summary, List.of(), details);
     }
 
     @Transactional(readOnly = true)
