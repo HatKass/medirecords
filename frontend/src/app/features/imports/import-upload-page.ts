@@ -22,9 +22,9 @@ const MAX_FILE_BYTES = 20 * 1024 * 1024;
     </div>
 
     <div class="mt-6 grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-      <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <label
-          class="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-12 text-center transition-colors"
+          class="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-8 text-center sm:px-6 sm:py-12 transition-colors"
           [class]="dragging() ? 'border-teal-500 bg-teal-50' : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50'"
           (dragover)="$event.preventDefault(); dragging.set(true)"
           (dragleave)="dragging.set(false)"
@@ -54,7 +54,7 @@ const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
         <div class="mt-6 flex justify-end">
           <button type="button" (click)="start()" [disabled]="!file() || uploading()"
-                  class="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50">
+                  class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-teal-600 px-5 py-2.5 sm:w-auto text-sm font-semibold text-white shadow-sm hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50">
             @if (uploading()) {
               <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden="true"></span>
               Uploading…
@@ -65,7 +65,7 @@ const MAX_FILE_BYTES = 20 * 1024 * 1024;
         </div>
       </section>
 
-      <aside class="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">
+      <aside class="rounded-2xl border border-slate-200 bg-white p-4 text-sm sm:p-6 text-slate-600 shadow-sm">
         <h2 class="font-semibold text-slate-900">File format</h2>
         <p class="mt-2">The first line is a header. Columns can be in any order; common spellings such as “First Name”, “DOB” or “Sex” are recognized.</p>
         <dl class="mt-4 space-y-3">

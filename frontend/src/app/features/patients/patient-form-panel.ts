@@ -31,9 +31,9 @@ const PATTERN_MESSAGES: Record<string, string> = {
   host: { '(document:keydown.escape)': 'close()' },
   template: `
     <div class="fixed inset-0 z-40 bg-slate-900/40" (click)="close()" aria-hidden="true"></div>
-    <aside class="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col bg-white shadow-2xl"
+    <aside class="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col bg-white shadow-2xl sm:rounded-l-2xl"
            role="dialog" aria-modal="true" aria-labelledby="panel-title">
-      <header class="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+      <header class="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 sm:px-6 sm:py-4">
         <div>
           <h2 id="panel-title" class="text-lg font-semibold">{{ heading() }}</h2>
           @if (patient(); as current) {
@@ -48,7 +48,7 @@ const PATTERN_MESSAGES: Record<string, string> = {
       </header>
 
       <form [formGroup]="form" (ngSubmit)="save()" class="flex min-h-0 flex-1 flex-col" novalidate>
-        <div class="flex-1 space-y-5 overflow-y-auto px-6 py-5">
+        <div class="flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6">
           @if (bannerError()) {
             <p class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{{ bannerError() }}</p>
           }
@@ -117,13 +117,13 @@ const PATTERN_MESSAGES: Record<string, string> = {
           }
         </div>
 
-        <footer class="flex justify-end gap-3 border-t border-slate-200 px-6 py-4">
-          <button type="button" (click)="close()" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+        <footer class="flex justify-end gap-3 border-t border-slate-200 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
+          <button type="button" (click)="close()" class="flex-1 rounded-lg border border-slate-300 px-4 py-2.5 sm:flex-none sm:py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
             {{ readOnly() ? 'Close' : 'Cancel' }}
           </button>
           @if (!readOnly()) {
             <button type="submit" [disabled]="saving()"
-                    class="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60">
+                    class="flex-1 rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none sm:py-2">
               {{ saving() ? 'Saving…' : patient() ? 'Save changes' : 'Create patient' }}
             </button>
           }

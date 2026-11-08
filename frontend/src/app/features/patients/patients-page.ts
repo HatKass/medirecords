@@ -24,6 +24,19 @@ import { PatientsService } from './patients.service';
 
 const PAGE_SIZES = [10, 20, 50, 100];
 const SORT_FIELDS: SortField[] = ['lastName', 'dateOfBirth', 'city', 'bloodType', 'updatedAt'];
+/** Phones show no column headers, so sorting is a menu of field + direction pairs. */
+const SORT_OPTIONS: { value: string; label: string }[] = [
+  { value: 'lastName,asc', label: 'Name (A to Z)' },
+  { value: 'lastName,desc', label: 'Name (Z to A)' },
+  { value: 'dateOfBirth,desc', label: 'Youngest first' },
+  { value: 'dateOfBirth,asc', label: 'Oldest first' },
+  { value: 'city,asc', label: 'City (A to Z)' },
+  { value: 'city,desc', label: 'City (Z to A)' },
+  { value: 'bloodType,asc', label: 'Blood type' },
+  { value: 'bloodType,desc', label: 'Blood type (reversed)' },
+  { value: 'updatedAt,desc', label: 'Recently updated' },
+  { value: 'updatedAt,asc', label: 'Least recently updated' },
+];
 const DEFAULT_QUERY: PatientQuery = {
   page: 0, size: 20, sort: 'lastName', direction: 'asc', name: '', city: '', bloodType: '',
 };
@@ -89,8 +102,8 @@ interface PanelState {
     </div>
 
     <!-- Filters -->
-    <div class="mt-6 grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
-      <label class="relative block">
+    <div class="mt-6 grid grid-cols-2 gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
+      <label class="relative col-span-2 block lg:col-span-1">
         <span class="sr-only">Search by name</span>
         <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
           <circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" />
@@ -112,7 +125,7 @@ interface PanelState {
         </select>
       </label>
       <button type="button" (click)="clearFilters()" [disabled]="!hasFilters()"
-              class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
+              class="col-span-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 lg:col-span-1">
         Clear filters
       </button>
     </div>
@@ -126,7 +139,62 @@ interface PanelState {
           <button type="button" (click)="reload()" class="mt-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700">Try again</button>
         </div>
       } @else {
-        <div class="overflow-x-auto" [class.opacity-60]="loading() && page()" [attr.aria-busy]="loading()">
+        <!-- Phones: sort menu + one card per patient (column headers are not shown) -->
+        <div class="md:hidden" [class.opacity-60]="loading() && page()" [attr.aria-busy]="loading()">
+          <label class="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Sort
+            <select class="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm font-normal normal-case tracking-normal text-slate-700"
+                    (change)="setSort($any($event.target).value)">
+              @for (option of sortOptions; track option.value) {
+                <option [value]="option.value" [selected]="option.value === sortValue()">{{ option.label }}</option>
+              }
+            </select>
+          </label>
+          <ul class="divide-y divide-slate-100">
+            @if (!page()) {
+              @for (row of skeletonRows; track row) {
+                <li class="space-y-2 px-4 py-4" aria-hidden="true">
+                  <div class="h-4 w-2/3 animate-pulse rounded bg-slate-200"></div>
+                  <div class="h-3 w-1/2 animate-pulse rounded bg-slate-100"></div>
+                </li>
+              }
+            } @else {
+              @for (patient of page()!.content; track patient.id) {
+                <li class="flex items-start gap-2 px-4 py-3">
+                  <button type="button" class="min-w-0 flex-1 text-left" (click)="openPatient(patient)">
+                    <span class="flex items-center gap-2">
+                      <span class="truncate font-medium text-slate-900">{{ patient.lastName }}, {{ patient.firstName }}</span>
+                      @if (patient.bloodType) {
+                        <span class="shrink-0 rounded-full bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-700">{{ bloodType(patient.bloodType) }}</span>
+                      }
+                    </span>
+                    <span class="block truncate text-xs text-slate-500">{{ patient.email }}</span>
+                    <span class="mt-1 block text-xs text-slate-600">
+                      {{ patient.city }} · {{ age(patient.dateOfBirth) }} yrs · {{ gender(patient.gender) }}
+                    </span>
+                  </button>
+                  @if (isAdmin()) {
+                    <button type="button" class="shrink-0 rounded-md p-2 text-slate-400 hover:bg-red-50 hover:text-red-600" (click)="deleting.set(patient)"
+                            [attr.aria-label]="'Delete ' + patient.firstName + ' ' + patient.lastName">
+                      <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" /></svg>
+                    </button>
+                  }
+                </li>
+              } @empty {
+                <li class="px-6 py-14 text-center">
+                  <p class="font-medium text-slate-900">{{ hasFilters() ? 'No patients match these filters' : 'No patients yet' }}</p>
+                  <p class="mt-1 text-sm text-slate-500">{{ hasFilters() ? 'Try a different name, city or blood type.' : 'Add a patient or import a CSV file to get started.' }}</p>
+                  @if (hasFilters()) {
+                    <button type="button" (click)="clearFilters()" class="mt-4 text-sm font-medium text-teal-700 hover:underline">Clear filters</button>
+                  }
+                </li>
+              }
+            }
+          </ul>
+        </div>
+
+        <!-- Tablets and up: table. "relative" keeps the sr-only header labels inside the scroll box. -->
+        <div class="relative hidden overflow-x-auto md:block" [class.opacity-60]="loading() && page()" [attr.aria-busy]="loading()">
           <table class="min-w-full divide-y divide-slate-200 text-sm">
             <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
               <tr>
@@ -206,7 +274,7 @@ interface PanelState {
 
         @if (page(); as current) {
           @if (current.totalElements > 0) {
-            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 text-sm text-slate-600">
+            <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-slate-200 px-4 py-3 text-sm text-slate-600">
               <p>Showing <strong>{{ rangeStart() }}–{{ rangeEnd() }}</strong> of <strong>{{ current.totalElements }}</strong></p>
               <div class="flex items-center gap-3">
                 <label class="flex items-center gap-2">
@@ -215,7 +283,7 @@ interface PanelState {
                     @for (size of pageSizes; track size) { <option [value]="size" [selected]="size === query().size">{{ size }}</option> }
                   </select>
                 </label>
-                <span class="text-slate-500">Page {{ current.page + 1 }} of {{ current.totalPages }}</span>
+                <span class="whitespace-nowrap text-slate-500"><span class="hidden sm:inline">Page </span>{{ current.page + 1 }} of {{ current.totalPages }}</span>
                 <div class="flex gap-1">
                   <button type="button" class="pager-button" [disabled]="current.page === 0 || loading()" (click)="update({ page: current.page - 1 })" aria-label="Previous page">‹</button>
                   <button type="button" class="pager-button" [disabled]="current.page + 1 >= current.totalPages || loading()" (click)="update({ page: current.page + 1 })" aria-label="Next page">›</button>
@@ -249,7 +317,7 @@ interface PanelState {
     .sort-button:hover { color: var(--color-slate-900); }
     .row-action { border-radius: 0.375rem; padding: 0.25rem 0.5rem; font-size: 0.8125rem; font-weight: 500; color: var(--color-teal-700); }
     .row-action:hover { background: var(--color-teal-50); }
-    .pager-button { border-radius: 0.375rem; border: 1px solid var(--color-slate-300); padding: 0.125rem 0.625rem; font-size: 1rem; }
+    .pager-button { border-radius: 0.375rem; border: 1px solid var(--color-slate-300); padding: 0.25rem 0.75rem; font-size: 1rem; }
     .pager-button:hover:not(:disabled) { background: var(--color-slate-50); }
     .pager-button:disabled { opacity: 0.4; cursor: not-allowed; }
   `,
@@ -263,6 +331,7 @@ export class PatientsPage {
   protected readonly isAdmin = inject(AuthService).isAdmin;
   protected readonly bloodTypes = BLOOD_TYPES;
   protected readonly pageSizes = PAGE_SIZES;
+  protected readonly sortOptions = SORT_OPTIONS;
   protected readonly skeletonRows = [0, 1, 2, 3, 4, 5];
 
   protected readonly query = toSignal(this.route.queryParamMap.pipe(map(parseQuery)), { requireSync: true });
@@ -289,6 +358,7 @@ export class PatientsPage {
     const page = this.page();
     return page ? page.page * page.size + page.content.length : 0;
   });
+  protected readonly sortValue = computed(() => `${this.query().sort},${this.query().direction}`);
   protected readonly skeletonCells = computed(() => (this.isAdmin() ? [0, 1, 2, 3, 4, 5, 6, 7] : [0, 1, 2, 3, 4, 5, 6]));
 
   constructor() {
@@ -354,6 +424,11 @@ export class PatientsPage {
     // Dates feel natural newest-first; text columns start A→Z.
     const firstDirection = field === 'updatedAt' ? 'desc' : 'asc';
     this.update({ sort: field, direction: sort === field ? (direction === 'asc' ? 'desc' : 'asc') : firstDirection, page: 0 });
+  }
+
+  protected setSort(value: string): void {
+    const [sort, direction] = value.split(',') as [SortField, 'asc' | 'desc'];
+    this.update({ sort, direction, page: 0 });
   }
 
   protected sortIcon(field: SortField): string {

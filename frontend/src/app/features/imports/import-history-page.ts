@@ -40,7 +40,59 @@ const LIVE_REFRESH_MS = 3000;
           <button type="button" (click)="reload()" class="mt-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700">Try again</button>
         </div>
       } @else {
-        <div class="overflow-x-auto">
+        <!-- Phones: one card per import -->
+        <ul class="divide-y divide-slate-100 md:hidden">
+          @if (!page()) {
+            @for (row of [0, 1, 2, 3]; track row) {
+              <li class="space-y-2 px-4 py-4" aria-hidden="true">
+                <div class="h-4 w-2/3 animate-pulse rounded bg-slate-200"></div>
+                <div class="h-3 w-1/2 animate-pulse rounded bg-slate-100"></div>
+              </li>
+            }
+          } @else {
+            @for (item of page()!.content; track item.id) {
+              <li class="px-4 py-3">
+                <button type="button" class="block w-full text-left" (click)="open(item)">
+                  <span class="flex items-start justify-between gap-3">
+                    <span class="min-w-0">
+                      <span class="block truncate font-medium text-slate-900">{{ item.fileName }}</span>
+                      <span class="block text-xs text-slate-500">#{{ item.id }} · {{ item.importedBy }} · {{ (item.startedAt ?? item.createdAt) | date: 'MMM d, HH:mm' }}</span>
+                    </span>
+                    <span class="shrink-0 text-right">
+                      <mr-import-status-badge [status]="item.status" />
+                      @if (!finished(item)) { <span class="mt-1 block text-xs tabular-nums text-slate-500">{{ item.progressPercent }}%</span> }
+                    </span>
+                  </span>
+                  <span class="mt-2 flex gap-4 text-xs tabular-nums">
+                    <span class="text-slate-600">{{ item.totalRows | number }} rows</span>
+                    <span class="text-emerald-700">{{ item.validRows | number }} valid</span>
+                    <span [class]="item.invalidRows > 0 ? 'text-amber-700' : 'text-slate-400'">{{ item.invalidRows | number }} invalid</span>
+                  </span>
+                </button>
+                @if (finished(item) && item.invalidRows > 0) {
+                  <button type="button" (click)="download(item)" [disabled]="downloadingId() === item.id"
+                          class="mt-2 -ml-2 rounded-md px-2 py-1 text-[0.8125rem] font-medium text-teal-700 hover:bg-teal-50 disabled:opacity-50"
+                          [attr.aria-label]="'Download error report for ' + item.fileName">
+                    {{ downloadingId() === item.id ? 'Preparing…' : 'Download error report' }}
+                  </button>
+                }
+              </li>
+            } @empty {
+              <li class="px-6 py-14 text-center">
+                <p class="font-medium text-slate-900">No imports yet</p>
+                <p class="mt-1 text-sm text-slate-500">
+                  {{ isAdmin() ? 'Upload a CSV file to add patients in bulk.' : 'Imports run by administrators will appear here.' }}
+                </p>
+                @if (isAdmin()) {
+                  <a routerLink="/import" class="mt-4 inline-block text-sm font-medium text-teal-700 hover:underline">Import a CSV file</a>
+                }
+              </li>
+            }
+          }
+        </ul>
+
+        <!-- Tablets and up: table. "relative" keeps the sr-only header label inside the scroll box. -->
+        <div class="relative hidden overflow-x-auto md:block">
           <table class="min-w-full divide-y divide-slate-200 text-sm">
             <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
               <tr>
@@ -115,7 +167,7 @@ const LIVE_REFRESH_MS = 3000;
 
         @if (page(); as current) {
           @if (current.totalPages > 1) {
-            <div class="flex items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 text-sm text-slate-600">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 text-sm text-slate-600">
               <p>{{ current.totalElements | number }} imports</p>
               <div class="flex items-center gap-3">
                 <span class="text-slate-500">Page {{ current.page + 1 }} of {{ current.totalPages }}</span>
@@ -129,7 +181,7 @@ const LIVE_REFRESH_MS = 3000;
     </div>
   `,
   styles: `
-    .pager-button { border-radius: 0.375rem; border: 1px solid var(--color-slate-300); padding: 0.125rem 0.625rem; font-size: 1rem; }
+    .pager-button { border-radius: 0.375rem; border: 1px solid var(--color-slate-300); padding: 0.25rem 0.75rem; font-size: 1rem; }
     .pager-button:hover:not(:disabled) { background: var(--color-slate-50); }
     .pager-button:disabled { opacity: 0.4; cursor: not-allowed; }
   `,

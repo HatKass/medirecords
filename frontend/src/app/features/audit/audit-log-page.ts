@@ -1,4 +1,4 @@
-import { DatePipe, DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, ParamMap, Params, Router, RouterLink } from '@angular/router';
@@ -7,6 +7,7 @@ import { errorMessage } from '../../core/http/problem';
 import { ToastService } from '../../core/toast/toast.service';
 import { Page } from '../patients/patient.models';
 import {
+  ACTION_BADGE,
   AUDIT_ACTIONS,
   AuditAction,
   AuditEntry,
@@ -48,19 +49,9 @@ function toParams(query: AuditQuery): Params {
 
 type LoadResult = { page: Page<AuditEntry> } | { error: string } | { invalidRange: true };
 
-const ACTION_BADGE: Record<AuditAction, string> = {
-  CREATE: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
-  UPDATE: 'bg-sky-50 text-sky-700 ring-sky-600/20',
-  DELETE: 'bg-rose-50 text-rose-700 ring-rose-600/20',
-  IMPORT: 'bg-violet-50 text-violet-700 ring-violet-600/20',
-  LOGIN_SUCCESS: 'bg-slate-50 text-slate-700 ring-slate-500/20',
-  LOGIN_FAILED: 'bg-amber-50 text-amber-800 ring-amber-600/30',
-  LOGOUT: 'bg-slate-50 text-slate-500 ring-slate-400/20',
-};
-
 @Component({
   selector: 'mr-audit-log-page',
-  imports: [DatePipe, DecimalPipe, RouterLink],
+  imports: [DatePipe, DecimalPipe, NgTemplateOutlet, RouterLink],
   template: `
     <div>
       <h1 class="text-2xl font-semibold tracking-tight">Audit log</h1>
@@ -71,7 +62,7 @@ const ACTION_BADGE: Record<AuditAction, string> = {
     </div>
 
     <!-- Filters -->
-    <div class="mt-6 grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
+    <div class="mt-6 grid grid-cols-2 gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4 lg:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
       <label class="block">
         <span class="filter-label">User</span>
         <select class="filter-input" (change)="update({ actor: $any($event.target).value, page: 0 })">
@@ -96,7 +87,7 @@ const ACTION_BADGE: Record<AuditAction, string> = {
         <input type="date" class="filter-input" [value]="query().to" [min]="query().from || null"
                (change)="update({ to: $any($event.target).value, page: 0 })" />
       </label>
-      <div class="flex items-end">
+      <div class="col-span-2 flex items-end lg:col-span-1">
         <button type="button" (click)="clearFilters()" [disabled]="!hasFilters()"
                 class="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
           Clear filters
@@ -118,7 +109,51 @@ const ACTION_BADGE: Record<AuditAction, string> = {
           <button type="button" (click)="reload()" class="mt-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700">Try again</button>
         </div>
       } @else {
-        <div class="overflow-x-auto" [class.opacity-60]="loading() && page()" [attr.aria-busy]="loading()">
+        <!-- Phones: one card per entry; tap to expand -->
+        <ul class="divide-y divide-slate-100 md:hidden" [class.opacity-60]="loading() && page()" [attr.aria-busy]="loading()">
+          @if (!page()) {
+            @for (row of [0, 1, 2, 3, 4]; track row) {
+              <li class="space-y-2 px-4 py-4" aria-hidden="true">
+                <div class="h-3 w-1/3 animate-pulse rounded bg-slate-200"></div>
+                <div class="h-4 w-3/4 animate-pulse rounded bg-slate-100"></div>
+              </li>
+            }
+          } @else {
+            @for (entry of page()!.content; track entry.id) {
+              <li>
+                <button type="button" class="flex w-full items-start gap-3 px-4 py-3 text-left" (click)="toggle(entry)"
+                        [attr.aria-expanded]="expandedId() === entry.id">
+                  <span class="min-w-0 flex-1">
+                    <span class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset" [class]="badge(entry.action)">{{ label(entry.action) }}</span>
+                      <span class="text-xs text-slate-500">{{ entry.actor }} · {{ entry.occurredAt | date: 'MMM d, HH:mm:ss' }}</span>
+                    </span>
+                    <span class="mt-1 block text-sm text-slate-800">{{ entry.summary }}</span>
+                    @if (entry.entityId !== null) {
+                      <span class="block text-xs text-slate-400">{{ entry.entityType }} #{{ entry.entityId }}</span>
+                    }
+                  </span>
+                  <svg class="mt-1 h-4 w-4 shrink-0 text-slate-400 transition-transform" [class.rotate-180]="expandedId() === entry.id" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+                </button>
+                @if (expandedId() === entry.id) {
+                  <div class="overflow-x-auto bg-slate-50/70 px-4 pb-4 pt-1">
+                    <ng-container *ngTemplateOutlet="entryDetails; context: { $implicit: entry }" />
+                  </div>
+                }
+              </li>
+            } @empty {
+              <li class="px-6 py-14 text-center">
+                <p class="font-medium text-slate-900">{{ hasFilters() ? 'No entries match these filters' : 'No activity yet' }}</p>
+                <p class="mt-1 text-sm text-slate-500">
+                  {{ hasFilters() ? 'Try a wider date range or clear the filters.' : 'Sign-ins and changes to patients will show up here.' }}
+                </p>
+              </li>
+            }
+          }
+        </ul>
+
+        <!-- Tablets and up: table. "relative" keeps the sr-only header label inside the scroll box. -->
+        <div class="relative hidden overflow-x-auto md:block" [class.opacity-60]="loading() && page()" [attr.aria-busy]="loading()">
           <table class="min-w-full divide-y divide-slate-200 text-sm">
             <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
               <tr>
@@ -162,51 +197,7 @@ const ACTION_BADGE: Record<AuditAction, string> = {
                   @if (expandedId() === entry.id) {
                     <tr class="bg-slate-50/70">
                       <td colspan="5" class="px-4 pb-4 pt-1">
-                        @if (entry.action === 'IMPORT') {
-                          <dl class="grid max-w-2xl grid-cols-2 gap-3 sm:grid-cols-4">
-                            <div class="detail-card"><dt>Status</dt><dd [class.text-rose-700]="entry.details.status === 'FAILED'">{{ entry.details.status }}</dd></div>
-                            <div class="detail-card"><dt>Total rows</dt><dd>{{ entry.details.totalRows | number }}</dd></div>
-                            <div class="detail-card"><dt>Valid</dt><dd class="text-emerald-700">{{ entry.details.validRows | number }}</dd></div>
-                            <div class="detail-card"><dt>Invalid</dt><dd [class.text-amber-700]="(entry.details.invalidRows ?? 0) > 0">{{ entry.details.invalidRows | number }}</dd></div>
-                          </dl>
-                          @if (entry.details.failureMessage) {
-                            <p class="mt-3 max-w-2xl text-sm text-rose-700">{{ entry.details.failureMessage }}</p>
-                          }
-                          <a [routerLink]="['/imports', entry.entityId]" class="mt-3 inline-block text-sm font-medium text-teal-700 hover:underline">
-                            View import #{{ entry.entityId }} and its rejected rows →
-                          </a>
-                        } @else if (isAuthEvent(entry.action)) {
-                          <p class="text-sm text-slate-500">
-                            {{ entry.action === 'LOGIN_FAILED' ? 'Username as typed' : 'User' }}: <span class="font-medium text-slate-700">{{ entry.actor }}</span>
-                            · {{ entry.occurredAt | date: 'MMM d, y, HH:mm:ss.SSS' }}.
-                            Sign-in events record only the username and the time, never a password.
-                          </p>
-                        } @else if (entry.changes.length > 0) {
-                          <table class="w-full max-w-3xl overflow-hidden rounded-lg border border-slate-200 bg-white text-sm">
-                            <thead class="bg-slate-50 text-left text-xs font-semibold text-slate-500">
-                              <tr>
-                                <th scope="col" class="px-3 py-2">Field</th>
-                                <th scope="col" class="px-3 py-2">{{ entry.action === 'CREATE' ? '' : 'Before' }}</th>
-                                <th scope="col" class="px-3 py-2">{{ entry.action === 'DELETE' ? '' : 'After' }}</th>
-                              </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-100">
-                              @for (change of entry.changes; track change.field) {
-                                <tr>
-                                  <td class="whitespace-nowrap px-3 py-2 font-medium text-slate-700">{{ field(change.field) }}</td>
-                                  <td class="px-3 py-2 break-all" [class]="entry.action === 'UPDATE' ? 'text-rose-700 line-through decoration-rose-300' : 'text-slate-700'">
-                                    @if (entry.action !== 'CREATE') { {{ value(change.field, change.oldValue) }} }
-                                  </td>
-                                  <td class="px-3 py-2 break-all" [class]="entry.action === 'UPDATE' ? 'text-emerald-700' : 'text-slate-700'">
-                                    @if (entry.action !== 'DELETE') { {{ value(change.field, change.newValue) }} }
-                                  </td>
-                                </tr>
-                              }
-                            </tbody>
-                          </table>
-                        } @else {
-                          <p class="text-sm text-slate-500">No field details were recorded for this entry.</p>
-                        }
+                        <ng-container *ngTemplateOutlet="entryDetails; context: { $implicit: entry }" />
                       </td>
                     </tr>
                   }
@@ -227,7 +218,7 @@ const ACTION_BADGE: Record<AuditAction, string> = {
 
         @if (page(); as current) {
           @if (current.totalPages > 1) {
-            <div class="flex items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 text-sm text-slate-600">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 text-sm text-slate-600">
               <p>{{ current.totalElements | number }} entries</p>
               <div class="flex items-center gap-3">
                 <span class="text-slate-500">Page {{ current.page + 1 }} of {{ current.totalPages }}</span>
@@ -239,6 +230,55 @@ const ACTION_BADGE: Record<AuditAction, string> = {
         }
       }
     </div>
+
+    <!-- Details of one entry: shown under its row (table) or its card (phones). -->
+    <ng-template #entryDetails let-entry>
+      @if (entry.action === 'IMPORT') {
+        <dl class="grid max-w-2xl grid-cols-2 gap-3 sm:grid-cols-4">
+          <div class="detail-card"><dt>Status</dt><dd [class.text-rose-700]="entry.details.status === 'FAILED'">{{ entry.details.status }}</dd></div>
+          <div class="detail-card"><dt>Total rows</dt><dd>{{ entry.details.totalRows | number }}</dd></div>
+          <div class="detail-card"><dt>Valid</dt><dd class="text-emerald-700">{{ entry.details.validRows | number }}</dd></div>
+          <div class="detail-card"><dt>Invalid</dt><dd [class.text-amber-700]="(entry.details.invalidRows ?? 0) > 0">{{ entry.details.invalidRows | number }}</dd></div>
+        </dl>
+        @if (entry.details.failureMessage) {
+          <p class="mt-3 max-w-2xl text-sm text-rose-700">{{ entry.details.failureMessage }}</p>
+        }
+        <a [routerLink]="['/imports', entry.entityId]" class="mt-3 inline-block text-sm font-medium text-teal-700 hover:underline">
+          View import #{{ entry.entityId }} and its rejected rows →
+        </a>
+      } @else if (isAuthEvent(entry.action)) {
+        <p class="text-sm text-slate-500">
+          {{ entry.action === 'LOGIN_FAILED' ? 'Username as typed' : 'User' }}: <span class="font-medium text-slate-700">{{ entry.actor }}</span>
+          · {{ entry.occurredAt | date: 'MMM d, y, HH:mm:ss.SSS' }}.
+          Sign-in events record only the username and the time, never a password.
+        </p>
+      } @else if (entry.changes.length > 0) {
+        <table class="w-full max-w-3xl overflow-hidden rounded-lg border border-slate-200 bg-white text-sm">
+          <thead class="bg-slate-50 text-left text-xs font-semibold text-slate-500">
+            <tr>
+              <th scope="col" class="px-3 py-2">Field</th>
+              <th scope="col" class="px-3 py-2">{{ entry.action === 'CREATE' ? '' : 'Before' }}</th>
+              <th scope="col" class="px-3 py-2">{{ entry.action === 'DELETE' ? '' : 'After' }}</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            @for (change of entry.changes; track change.field) {
+              <tr>
+                <td class="whitespace-nowrap px-3 py-2 font-medium text-slate-700">{{ field(change.field) }}</td>
+                <td class="px-3 py-2 break-all" [class]="entry.action === 'UPDATE' ? 'text-rose-700 line-through decoration-rose-300' : 'text-slate-700'">
+                  @if (entry.action !== 'CREATE') { {{ value(change.field, change.oldValue) }} }
+                </td>
+                <td class="px-3 py-2 break-all" [class]="entry.action === 'UPDATE' ? 'text-emerald-700' : 'text-slate-700'">
+                  @if (entry.action !== 'DELETE') { {{ value(change.field, change.newValue) }} }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      } @else {
+        <p class="text-sm text-slate-500">No field details were recorded for this entry.</p>
+      }
+    </ng-template>
   `,
   styles: `
     .filter-label { display: block; margin-bottom: 0.25rem; font-size: 0.75rem; font-weight: 500; color: var(--color-slate-500); }
@@ -250,7 +290,7 @@ const ACTION_BADGE: Record<AuditAction, string> = {
     .detail-card { border-radius: 0.5rem; border: 1px solid var(--color-slate-200); background: white; padding: 0.5rem 0.75rem; }
     .detail-card dt { font-size: 0.75rem; color: var(--color-slate-500); }
     .detail-card dd { font-size: 1rem; font-weight: 600; font-variant-numeric: tabular-nums; }
-    .pager-button { border-radius: 0.375rem; border: 1px solid var(--color-slate-300); padding: 0.125rem 0.625rem; font-size: 1rem; }
+    .pager-button { border-radius: 0.375rem; border: 1px solid var(--color-slate-300); padding: 0.25rem 0.75rem; font-size: 1rem; }
     .pager-button:hover:not(:disabled) { background: var(--color-slate-50); }
     .pager-button:disabled { opacity: 0.4; cursor: not-allowed; }
   `,

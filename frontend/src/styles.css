@@ -1,3 +1,16 @@
 /* You can add global styles to this file, and also import other style files */
 
 @import 'tailwindcss';
+
+/*
+ * iOS Safari zooms the page when a focused field's text is smaller than 16px, and does not zoom back.
+ * Phones get 16px form text; from the sm breakpoint up the components' own (smaller) sizes apply.
+ * !important is needed to beat the components' scoped classes (e.g. .field-input).
+ */
+@media (max-width: 639px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='file']),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}

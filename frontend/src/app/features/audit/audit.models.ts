@@ -58,6 +58,17 @@ export interface AuditQuery {
   to: string;
 }
 
+/** Tailwind classes for an action's badge (used with `ring-1 ring-inset`). */
+export const ACTION_BADGE: Record<AuditAction, string> = {
+  CREATE: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+  UPDATE: 'bg-sky-50 text-sky-700 ring-sky-600/20',
+  DELETE: 'bg-rose-50 text-rose-700 ring-rose-600/20',
+  IMPORT: 'bg-violet-50 text-violet-700 ring-violet-600/20',
+  LOGIN_SUCCESS: 'bg-slate-50 text-slate-700 ring-slate-500/20',
+  LOGIN_FAILED: 'bg-amber-50 text-amber-800 ring-amber-600/30',
+  LOGOUT: 'bg-slate-50 text-slate-500 ring-slate-400/20',
+};
+
 export function actionLabel(action: AuditAction): string {
   return AUDIT_ACTIONS.find((item) => item.value === action)?.label ?? action;
 }
