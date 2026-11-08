@@ -7,12 +7,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 
 /**
  * Minimal browser stand-in for tests: keeps cookies from Set-Cookie headers, sends each one only to
@@ -66,6 +69,18 @@ public class TestBrowser {
         return send(HttpMethod.POST, path, body, type, false);
     }
 
+    /** Multipart upload of one file part named "file", like a browser form / FormData. */
+    public <T> ResponseEntity<T> upload(String path, String fileName, byte[] content, Class<T> type) {
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("file", new ByteArrayResource(content) {
+            @Override
+            public String getFilename() {
+                return fileName;
+            }
+        });
+        return send(HttpMethod.POST, path, body, type, true, MediaType.MULTIPART_FORM_DATA);
+    }
+
     public <T> ResponseEntity<T> put(String path, Object body, Class<T> type) {
         return send(HttpMethod.PUT, path, body, type, true);
     }
@@ -92,8 +107,13 @@ public class TestBrowser {
     }
 
     private <T> ResponseEntity<T> send(HttpMethod method, String path, Object body, Class<T> type, boolean withCsrf) {
+        return send(method, path, body, type, withCsrf, MediaType.APPLICATION_JSON);
+    }
+
+    private <T> ResponseEntity<T> send(HttpMethod method, String path, Object body, Class<T> type, boolean withCsrf,
+            MediaType contentType) {
         HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setContentType(contentType);
         String cookieHeader = cookies.entrySet().stream()
                 .filter(entry -> path.startsWith(entry.getValue().path()))
                 .map(entry -> entry.getKey() + "=" + entry.getValue().value())
