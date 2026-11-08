@@ -3,3 +3,5 @@
 *.sh text eol=lf
 mvnw text eol=lf
 *.cmd text eol=crlf
+# Sample CSVs are committed byte-for-byte (BOM, CRLF) because the messiness is the point.
+sample-data/*.csv -text

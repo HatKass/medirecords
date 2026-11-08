@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, guestGuard } from './core/auth/auth.guards';
+import { authGuard, guestGuard, roleGuard } from './core/auth/auth.guards';
 
 export const routes: Routes = [
   {
@@ -23,6 +23,22 @@ export const routes: Routes = [
         path: 'patients',
         title: 'Patients Â· MediRecords',
         loadComponent: () => import('./features/patients/patients-page').then((m) => m.PatientsPage),
+      },
+      {
+        path: 'import',
+        title: 'Import patients · MediRecords',
+        canActivate: [roleGuard('ADMIN')],
+        loadComponent: () => import('./features/imports/import-upload-page').then((m) => m.ImportUploadPage),
+      },
+      {
+        path: 'imports',
+        title: 'Import history · MediRecords',
+        loadComponent: () => import('./features/imports/import-history-page').then((m) => m.ImportHistoryPage),
+      },
+      {
+        path: 'imports/:id',
+        title: 'Import details · MediRecords',
+        loadComponent: () => import('./features/imports/import-detail-page').then((m) => m.ImportDetailPage),
       },
       {
         path: 'status',

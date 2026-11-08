@@ -24,6 +24,11 @@ spring:
     multipart:
       max-file-size: ${UPLOAD_MAX_FILE_SIZE:20MB}
       max-request-size: ${UPLOAD_MAX_FILE_SIZE:20MB}
+  batch:
+    job:
+      enabled: false              # jobs are launched on upload, never at application start
+    jdbc:
+      initialize-schema: never    # Flyway owns the Batch tables (V6)
   jackson:
     time-zone: UTC
   data:
@@ -80,3 +85,8 @@ app:
       # Secure cookies are only sent over HTTPS. Keep true in production; set COOKIE_SECURE=false for
       # plain-HTTP local runs in browsers that do not treat http://localhost as secure (e.g. Safari).
       secure: ${COOKIE_SECURE:true}
+  patient-import:
+    # Uploaded CSVs wait here until their job has run, then are deleted. Any writable local path works.
+    storage-dir: ${IMPORT_STORAGE_DIR:${java.io.tmpdir}/medirecords-imports}
+    chunk-size: ${IMPORT_CHUNK_SIZE:500}   # rows per transaction
+    max-concurrent-jobs: ${IMPORT_MAX_CONCURRENT_JOBS:2}

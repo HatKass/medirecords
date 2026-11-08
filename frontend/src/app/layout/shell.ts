@@ -19,6 +19,13 @@ const NAV_ITEMS: NavItem[] = [
     path: '/patients',
     icon: 'M16 19v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1M9.5 10a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M21 19v-1a4 4 0 0 0-3-3.87M15.5 3.13a3.5 3.5 0 0 1 0 6.74',
   },
+  {
+    label: 'Import',
+    path: '/import',
+    icon: 'M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3',
+    roles: ['ADMIN'],
+  },
+  { label: 'Import history', path: '/imports', icon: 'M12 8v4l3 2M3.05 11a9 9 0 1 1 .5 4M3 4v5h5' },
   { label: 'System status', path: '/status', icon: 'M4 13h4l3-8 3 14 3-6h3' },
 ];
 
