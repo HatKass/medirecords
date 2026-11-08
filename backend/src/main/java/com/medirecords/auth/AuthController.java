@@ -1,5 +1,7 @@
 package com.medirecords.auth;
 
+import com.medirecords.audit.AuditAction;
+import com.medirecords.audit.AuditService;
 import com.medirecords.auth.AuthDtos.CurrentUser;
 import com.medirecords.auth.AuthDtos.LoginRequest;
 import com.medirecords.auth.RefreshTokenService.IssuedRefreshToken;
@@ -14,6 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.CookieValue;
@@ -38,24 +41,34 @@ public class AuthController {
     private final JwtTokenService accessTokens;
     private final RefreshTokenService refreshTokens;
     private final AuthCookies cookies;
+    private final AuditService audit;
 
     public AuthController(AuthenticationManager authenticationManager, JwtTokenService accessTokens,
-            RefreshTokenService refreshTokens, AuthCookies cookies) {
+            RefreshTokenService refreshTokens, AuthCookies cookies, AuditService audit) {
         this.authenticationManager = authenticationManager;
         this.accessTokens = accessTokens;
         this.refreshTokens = refreshTokens;
         this.cookies = cookies;
+        this.audit = audit;
     }
 
     @PostMapping("/login")
     @SecurityRequirements // public endpoint
     @Operation(summary = "Sign in: sets the HttpOnly access and refresh cookies and returns the user")
     public CurrentUser login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
-        AuthenticatedUser user = (AuthenticatedUser) authenticationManager.authenticate(
-                UsernamePasswordAuthenticationToken.unauthenticated(request.username(), request.password()))
-                .getPrincipal();
+        AuthenticatedUser user;
+        try {
+            user = (AuthenticatedUser) authenticationManager.authenticate(
+                    UsernamePasswordAuthenticationToken.unauthenticated(request.username(), request.password()))
+                    .getPrincipal();
+        } catch (AuthenticationException exception) {
+            // Only the typed username is audited; the password never leaves this method.
+            audit.recordAuthentication(AuditAction.LOGIN_FAILED, request.username());
+            throw exception; // GlobalExceptionHandler answers 401 with a generic message
+        }
         IssuedRefreshToken refreshToken = refreshTokens.startSession(user.getUserId());
         cookies.writeSession(response, accessTokens.issue(user, refreshToken.familyId()), refreshToken);
+        audit.recordAuthentication(AuditAction.LOGIN_SUCCESS, user.getUsername());
         return toCurrentUser(user);
     }
 
@@ -83,6 +96,10 @@ public class AuthController {
             refreshTokens.revokeSession(UUID.fromString(jwt.getClaimAsString(JwtClaims.SESSION_ID)));
         }
         cookies.clear(response);
+        // Without a valid access cookie we cannot tell who is signing out, so there is nothing to attribute.
+        if (jwt != null) {
+            audit.recordAuthentication(AuditAction.LOGOUT, jwt.getSubject());
+        }
     }
 
     @GetMapping("/me")

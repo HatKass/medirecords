@@ -26,19 +26,25 @@ export const routes: Routes = [
       },
       {
         path: 'import',
-        title: 'Import patients · MediRecords',
+        title: 'Import patients Â· MediRecords',
         canActivate: [roleGuard('ADMIN')],
         loadComponent: () => import('./features/imports/import-upload-page').then((m) => m.ImportUploadPage),
       },
       {
         path: 'imports',
-        title: 'Import history · MediRecords',
+        title: 'Import history Â· MediRecords',
         loadComponent: () => import('./features/imports/import-history-page').then((m) => m.ImportHistoryPage),
       },
       {
         path: 'imports/:id',
-        title: 'Import details · MediRecords',
+        title: 'Import details Â· MediRecords',
         loadComponent: () => import('./features/imports/import-detail-page').then((m) => m.ImportDetailPage),
+      },
+      {
+        path: 'audit-log',
+        title: 'Audit log Â· MediRecords',
+        canActivate: [roleGuard('ADMIN')],
+        loadComponent: () => import('./features/audit/audit-log-page').then((m) => m.AuditLogPage),
       },
       {
         path: 'status',

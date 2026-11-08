@@ -52,16 +52,19 @@ public class ImportService {
     private final JobLauncher jobLauncher;
     private final Job patientImportJob;
     private final TransactionTemplate transaction;
+    private final ImportAudit audit;
     private final Clock clock;
 
     public ImportService(PatientImportRepository imports, ImportRowErrorRepository errors, ImportFileStorage storage,
-            JobLauncher jobLauncher, Job patientImportJob, TransactionTemplate transaction, Clock clock) {
+            JobLauncher jobLauncher, Job patientImportJob, TransactionTemplate transaction, ImportAudit audit,
+            Clock clock) {
         this.imports = imports;
         this.errors = errors;
         this.storage = storage;
         this.jobLauncher = jobLauncher;
         this.patientImportJob = patientImportJob;
         this.transaction = transaction;
+        this.audit = audit;
         this.clock = clock;
     }
 
@@ -145,6 +148,7 @@ public class ImportService {
         for (PatientImport interrupted : imports.findByStatusIn(List.of(ImportStatus.QUEUED, ImportStatus.RUNNING))) {
             interrupted.markFailed("The import was interrupted by a server restart. Rows imported before "
                     + "this point were kept; upload the file again to import the rest.", clock.instant());
+            audit.recordFinished(interrupted);
             log.warn("Marked interrupted import {} as failed", interrupted.getId());
         }
     }
@@ -164,7 +168,10 @@ public class ImportService {
         // The async launcher reports a full worker queue by returning an execution that FAILED without starting.
         if (execution == null || execution.getStatus() == BatchStatus.FAILED && execution.getStartTime() == null) {
             transaction.executeWithoutResult(status -> imports.findById(patientImport.getId())
-                    .ifPresent(queued -> queued.markFailed(NOT_STARTED, clock.instant())));
+                    .ifPresent(queued -> {
+                        queued.markFailed(NOT_STARTED, clock.instant());
+                        audit.recordFinished(queued);
+                    }));
             storage.delete(file);
             throw new ErrorResponseException(HttpStatus.SERVICE_UNAVAILABLE,
                     ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, NOT_STARTED), null);
