@@ -38,23 +38,28 @@ const NAV_ITEMS: NavItem[] = [
 /** Authenticated layout: sidebar navigation (collapsible on small screens) and a top bar. */
 @Component({
   selector: 'mr-shell',
+  host: { '(document:keydown.escape)': 'menuOpen.set(false)' },
   imports: [RouterOutlet, RouterLink, RouterLinkActive],
   template: `
-    <div class="min-h-screen lg:flex">
+    <div class="min-h-dvh lg:flex">
       @if (menuOpen()) {
         <div class="fixed inset-0 z-30 bg-slate-900/40 lg:hidden" (click)="menuOpen.set(false)" aria-hidden="true"></div>
       }
 
       <aside
-        class="fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-slate-200 bg-white transition-transform lg:static lg:translate-x-0"
+        class="fixed inset-y-0 left-0 z-40 flex w-64 max-w-[85vw] flex-col border-r border-slate-200 bg-white transition-[transform,visibility] lg:visible lg:static lg:max-w-none lg:translate-x-0"
         [class.-translate-x-full]="!menuOpen()"
+        [class.invisible]="!menuOpen()"
         aria-label="Main navigation"
       >
         <div class="flex h-16 items-center gap-3 border-b border-slate-200 px-5">
           <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-600 font-bold text-white">M</div>
           <span class="text-lg font-semibold tracking-tight">MediRecords</span>
+          <button type="button" (click)="menuOpen.set(false)" class="ml-auto rounded-lg p-2 text-slate-500 hover:bg-slate-100 lg:hidden" aria-label="Close navigation">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
         </div>
-        <nav class="flex-1 space-y-1 p-3">
+        <nav class="flex-1 space-y-1 overflow-y-auto p-3">
           @for (item of navItems(); track item.path) {
             <a
               [routerLink]="item.path"
@@ -76,23 +81,27 @@ const NAV_ITEMS: NavItem[] = [
 
       <div class="flex min-w-0 flex-1 flex-col">
         <header class="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b border-slate-200 bg-white/90 px-4 backdrop-blur sm:px-6">
-          <button
-            type="button"
-            class="rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden"
-            (click)="menuOpen.set(true)"
-            aria-label="Open navigation"
-          >
-            <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
-              <path d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
+          <div class="flex min-w-0 items-center gap-2 lg:hidden">
+            <button
+              type="button"
+              class="-ml-2 rounded-lg p-2 text-slate-600 hover:bg-slate-100"
+              (click)="menuOpen.set(true)"
+              aria-label="Open navigation"
+              [attr.aria-expanded]="menuOpen()"
+            >
+              <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+                <path d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <span class="hidden truncate font-semibold tracking-tight min-[400px]:inline">MediRecords</span>
+          </div>
           <div class="hidden lg:block"></div>
 
           @if (auth.user(); as user) {
-            <div class="flex items-center gap-3">
+            <div class="flex shrink-0 items-center gap-2 sm:gap-3">
               <p class="hidden text-sm font-medium sm:block" [title]="'Signed in as ' + user.username">{{ user.fullName }}</p>
               <span [class]="roleBadgeClass()">{{ user.roles.join(', ') }}</span>
-              <div class="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-700" aria-hidden="true">
+              <div class="hidden h-9 w-9 items-center justify-center rounded-full sm:flex bg-slate-200 text-sm font-semibold text-slate-700" aria-hidden="true">
                 {{ initials() }}
               </div>
               <button

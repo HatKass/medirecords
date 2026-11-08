@@ -7,6 +7,7 @@ import static org.awaitility.Awaitility.await;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.medirecords.TestcontainersConfiguration;
 import com.medirecords.support.TestBrowser;
+import com.medirecords.support.TestData;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -15,7 +16,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,7 +44,7 @@ class AuditIntegrationTest {
     void setUp() {
         admin = new TestBrowser(restTemplate);
         admin.login("admin");
-        token = UUID.randomUUID().toString().replaceAll("[^a-f]", "").substring(0, 6) + "zq";
+        token = TestData.randomLetters(6) + "zq";
     }
 
     @Test

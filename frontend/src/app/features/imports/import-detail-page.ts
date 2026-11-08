@@ -27,7 +27,7 @@ const ERROR_PREVIEW_SIZE = 10;
       <div class="mt-3 flex flex-wrap items-start justify-between gap-4">
         <div class="min-w-0">
           <h1 class="flex flex-wrap items-center gap-3 text-2xl font-semibold tracking-tight">
-            <span class="truncate">{{ current.fileName }}</span>
+            <span class="max-w-full truncate">{{ current.fileName }}</span>
             <mr-import-status-badge [status]="current.status" />
           </h1>
           <p class="mt-1 text-sm text-slate-500">
@@ -50,8 +50,8 @@ const ERROR_PREVIEW_SIZE = 10;
       </div>
 
       <!-- Progress -->
-      <section class="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div class="flex items-baseline justify-between gap-4 text-sm">
+      <section class="mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm">
           <p class="font-medium text-slate-900">
             @switch (current.status) {
               @case ('QUEUED') { Waiting for a free worker… }
@@ -71,18 +71,18 @@ const ERROR_PREVIEW_SIZE = 10;
                [style.width.%]="current.progressPercent"></div>
         </div>
 
-        <dl class="mt-6 grid gap-4 sm:grid-cols-3">
-          <div class="rounded-xl bg-slate-50 p-4">
-            <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Rows processed</dt>
-            <dd class="mt-1 text-2xl font-semibold tabular-nums">{{ current.totalRows | number }}</dd>
+        <dl class="mt-6 grid grid-cols-3 gap-2 sm:gap-4">
+          <div class="rounded-xl bg-slate-50 p-3 sm:p-4">
+            <dt class="text-[0.6875rem] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs"><span class="hidden sm:inline">Rows </span>processed</dt>
+            <dd class="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">{{ current.totalRows | number }}</dd>
           </div>
-          <div class="rounded-xl bg-emerald-50 p-4">
-            <dt class="text-xs font-semibold uppercase tracking-wide text-emerald-700">Imported</dt>
-            <dd class="mt-1 text-2xl font-semibold tabular-nums text-emerald-900">{{ current.validRows | number }}</dd>
+          <div class="rounded-xl bg-emerald-50 p-3 sm:p-4">
+            <dt class="text-[0.6875rem] sm:text-xs font-semibold uppercase tracking-wide text-emerald-700">Imported</dt>
+            <dd class="mt-1 text-xl font-semibold tabular-nums sm:text-2xl text-emerald-900">{{ current.validRows | number }}</dd>
           </div>
-          <div class="rounded-xl p-4" [class]="current.invalidRows > 0 ? 'bg-amber-50' : 'bg-slate-50'">
-            <dt class="text-xs font-semibold uppercase tracking-wide" [class]="current.invalidRows > 0 ? 'text-amber-700' : 'text-slate-500'">Rejected</dt>
-            <dd class="mt-1 text-2xl font-semibold tabular-nums" [class.text-amber-900]="current.invalidRows > 0">{{ current.invalidRows | number }}</dd>
+          <div class="rounded-xl p-3 sm:p-4" [class]="current.invalidRows > 0 ? 'bg-amber-50' : 'bg-slate-50'">
+            <dt class="text-[0.6875rem] sm:text-xs font-semibold uppercase tracking-wide" [class]="current.invalidRows > 0 ? 'text-amber-700' : 'text-slate-500'">Rejected</dt>
+            <dd class="mt-1 text-xl font-semibold tabular-nums sm:text-2xl" [class.text-amber-900]="current.invalidRows > 0">{{ current.invalidRows | number }}</dd>
           </div>
         </dl>
 
@@ -100,26 +100,29 @@ const ERROR_PREVIEW_SIZE = 10;
       <!-- First rejected rows -->
       @if (finished() && current.invalidRows > 0) {
         <section class="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div class="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-200 px-6 py-4">
+          <div class="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-200 px-4 py-4 sm:px-6">
             <h2 class="font-semibold text-slate-900">Rejected rows</h2>
             <p class="text-sm text-slate-500">
               Showing the first {{ errors().length }} of {{ current.invalidRows | number }}. The report contains all of them and can be fixed and re-imported.
             </p>
           </div>
-          <div class="overflow-x-auto">
+          <div class="relative overflow-x-auto">
             <table class="min-w-full divide-y divide-slate-200 text-sm">
               <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
-                  <th scope="col" class="px-6 py-3">Row</th>
-                  <th scope="col" class="px-6 py-3">Problem</th>
+                  <th scope="col" class="px-4 py-3 sm:px-6">Row</th>
+                  <th scope="col" class="px-4 py-3 sm:px-6">Problem</th>
                   <th scope="col" class="hidden px-6 py-3 md:table-cell">Original line</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-100">
                 @for (error of errors(); track error.rowNumber + error.reason) {
                   <tr>
-                    <td class="whitespace-nowrap px-6 py-3 tabular-nums text-slate-500">{{ error.rowNumber }}</td>
-                    <td class="px-6 py-3 text-slate-900">{{ error.reason }}</td>
+                    <td class="whitespace-nowrap px-4 py-3 align-top tabular-nums text-slate-500 sm:px-6">{{ error.rowNumber }}</td>
+                    <td class="px-4 py-3 text-slate-900 sm:px-6">
+                      {{ error.reason }}
+                      <span class="mt-1 block break-all font-mono text-xs text-slate-500 md:hidden">{{ error.rawLine }}</span>
+                    </td>
                     <td class="hidden max-w-md truncate px-6 py-3 font-mono text-xs text-slate-500 md:table-cell" [title]="error.rawLine">{{ error.rawLine }}</td>
                   </tr>
                 } @empty {

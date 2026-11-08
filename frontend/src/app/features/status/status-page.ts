@@ -14,7 +14,7 @@ type LoadState = 'loading' | 'ready' | 'error';
     <h1 class="text-2xl font-semibold tracking-tight">System status</h1>
     <p class="mt-1 text-sm text-slate-500">Live health of the API and its database.</p>
     <div class="mt-6 max-w-xl">
-      <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         @switch (state()) {
           @case ('loading') {
             <p class="animate-pulse text-slate-500">Checking backend…</p>
@@ -41,7 +41,7 @@ type LoadState = 'loading' | 'ready' | 'error';
           }
         }
 
-        <div class="mt-6 flex items-center justify-between">
+        <div class="mt-6 flex flex-wrap items-center justify-between gap-3">
           <a href="/swagger-ui/index.html" class="text-sm font-medium text-teal-700 hover:underline">API docs (Swagger)</a>
           <button
             type="button"

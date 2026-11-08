@@ -15,7 +15,7 @@ interface DemoAccount {
   selector: 'mr-login-page',
   imports: [ReactiveFormsModule],
   template: `
-    <main class="flex min-h-screen items-center justify-center px-4 py-12">
+    <main class="flex min-h-dvh items-center justify-center px-4 py-8 sm:py-12">
       <div class="w-full max-w-md">
         <div class="mb-8 flex items-center justify-center gap-3">
           <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-teal-600 text-lg font-bold text-white">M</div>
@@ -83,11 +83,11 @@ interface DemoAccount {
             @for (account of demoAccounts; track account.username) {
               <li class="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2">
                 <div class="min-w-0">
-                  <p class="text-sm">
+                  <p class="flex flex-wrap items-center gap-x-1 gap-y-1 text-sm">
                     <span class="font-mono font-medium">{{ account.username }}</span>
                     <span class="text-slate-400"> / </span>
                     <span class="font-mono">{{ account.password }}</span>
-                    <span class="ml-2 rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">{{ account.role }}</span>
+                    <span class="ml-1 rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">{{ account.role }}</span>
                   </p>
                   <p class="text-xs text-slate-500">{{ account.description }}</p>
                 </div>

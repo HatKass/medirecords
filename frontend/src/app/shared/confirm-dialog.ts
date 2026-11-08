@@ -5,18 +5,18 @@ import { Component, ElementRef, afterNextRender, input, output, viewChild } from
   selector: 'mr-confirm-dialog',
   host: { '(document:keydown.escape)': 'busy() || cancelled.emit()' },
   template: `
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" (click)="busy() || cancelled.emit()">
-      <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" role="alertdialog" aria-modal="true"
+    <div class="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-4 sm:items-center" (click)="busy() || cancelled.emit()">
+      <div class="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl sm:p-6" role="alertdialog" aria-modal="true"
            aria-labelledby="confirm-title" aria-describedby="confirm-message" (click)="$event.stopPropagation()">
         <h2 id="confirm-title" class="text-lg font-semibold">{{ title() }}</h2>
         <p id="confirm-message" class="mt-2 text-sm text-slate-600">{{ message() }}</p>
-        <div class="mt-6 flex justify-end gap-3">
+        <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
           <button #cancelButton type="button" (click)="cancelled.emit()" [disabled]="busy()"
-                  class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+                  class="rounded-lg border border-slate-300 px-4 py-2.5 text-sm sm:py-2 font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">
             Cancel
           </button>
           <button type="button" (click)="confirmed.emit()" [disabled]="busy()"
-                  class="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60">
+                  class="rounded-lg bg-red-600 px-4 py-2.5 text-sm sm:py-2 font-semibold text-white hover:bg-red-700 disabled:opacity-60">
             {{ busy() ? 'Working…' : confirmLabel() }}
           </button>
         </div>

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.medirecords.TestcontainersConfiguration;
 import com.medirecords.support.TestBrowser;
+import com.medirecords.support.TestData;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -40,7 +41,7 @@ class PatientIntegrationTest {
         admin = new TestBrowser(restTemplate);
         admin.login("admin");
         // Letters only, so it also works as a name filter.
-        token = UUID.randomUUID().toString().replaceAll("[^a-f]", "").substring(0, 6) + "zq";
+        token = TestData.randomLetters(6) + "zq";
     }
 
     @Test
